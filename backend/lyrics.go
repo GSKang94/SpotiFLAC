@@ -28,6 +28,7 @@ type LyricsLine struct {
 	StartTimeMs string `json:"startTimeMs"`
 	Words       string `json:"words"`
 	EndTimeMs   string `json:"endTimeMs"`
+	Translation string `json:"translation,omitempty"`
 }
 
 type LyricsResponse struct {
@@ -37,25 +38,28 @@ type LyricsResponse struct {
 }
 
 type LyricsDownloadRequest struct {
-	SpotifyID           string `json:"spotify_id"`
-	TrackName           string `json:"track_name"`
-	ArtistName          string `json:"artist_name"`
-	Artists             string `json:"artists,omitempty"`
-	AlbumName           string `json:"album_name"`
-	AlbumArtist         string `json:"album_artist"`
-	ReleaseDate         string `json:"release_date"`
-	ISRC                string `json:"isrc"`
-	OutputDir           string `json:"output_dir"`
-	FilenameFormat      string `json:"filename_format"`
-	PlaylistName        string `json:"playlist_name,omitempty"`
-	Category            string `json:"category,omitempty"`
-	UPC                 string `json:"upc,omitempty"`
-	TrackNumber         bool   `json:"track_number"`
-	Position            int    `json:"position"`
-	UseAlbumTrackNumber bool   `json:"use_album_track_number"`
-	DiscNumber          int    `json:"disc_number"`
-	TotalTracks         int    `json:"total_tracks,omitempty"`
-	TotalDiscs          int    `json:"total_discs,omitempty"`
+	SpotifyID             string `json:"spotify_id"`
+	TrackName             string `json:"track_name"`
+	ArtistName            string `json:"artist_name"`
+	Artists               string `json:"artists,omitempty"`
+	AlbumName             string `json:"album_name"`
+	AlbumArtist           string `json:"album_artist"`
+	ReleaseDate           string `json:"release_date"`
+	ISRC                  string `json:"isrc"`
+	OutputDir             string `json:"output_dir"`
+	FilenameFormat        string `json:"filename_format"`
+	PlaylistName          string `json:"playlist_name,omitempty"`
+	Category              string `json:"category,omitempty"`
+	UPC                   string `json:"upc,omitempty"`
+	TrackNumber           bool   `json:"track_number"`
+	Position              int    `json:"position"`
+	UseAlbumTrackNumber   bool   `json:"use_album_track_number"`
+	DiscNumber            int    `json:"disc_number"`
+	TotalTracks           int    `json:"total_tracks,omitempty"`
+	TotalDiscs            int    `json:"total_discs,omitempty"`
+	LyricsTranslationMode string `json:"lyrics_translation_mode,omitempty"`
+	LyricsTranslationLang string `json:"lyrics_translation_lang,omitempty"`
+	LRCLibTitleFallback   *bool  `json:"lrclib_title_fallback,omitempty"`
 }
 
 type LyricsDownloadResponse struct {
@@ -255,7 +259,7 @@ func hasLyrics(resp *LyricsResponse) bool {
 	return resp != nil && !resp.Error && len(resp.Lines) > 0
 }
 
-func (c *LyricsClient) FetchLyricsAllSources(spotifyID, trackName, artistName, albumName string, duration int) (*LyricsResponse, string, error) {
+func (c *LyricsClient) FetchLyricsAllSources(spotifyID, trackName, artistName, albumName string, duration int, titleFallback bool, translationMode, translationLang string) (*LyricsResponse, string, error) {
 
 	var unsyncedFallback *LyricsResponse
 	var unsyncedSource string
@@ -278,12 +282,25 @@ func (c *LyricsClient) FetchLyricsAllSources(spotifyID, trackName, artistName, a
 	var resp *LyricsResponse
 	var src string
 	var found bool
+	finish := func(resp *LyricsResponse, source string) (*LyricsResponse, string, error) {
+		switch strings.ToLower(strings.TrimSpace(translationMode)) {
+		case "copilot":
+			if err := ApplyAITranslations(ActiveDownloadContext(), resp, translationLang); err != nil {
+				return nil, "", fmt.Errorf("Copilot lyrics translation failed: %w", err)
+			}
+		case "gemini":
+			if err := ApplyGeminiTranslations(ActiveDownloadContext(), resp, translationLang); err != nil {
+				return nil, "", fmt.Errorf("Gemini lyrics translation failed: %w", err)
+			}
+		}
+		return resp, source, nil
+	}
 
 	resp, _ = c.FetchLyricsWithMetadata(trackName, artistName, albumName, duration)
 	resp, src, found = check(resp, nil, "LRCLIB")
 	if found {
 		fmt.Printf("   [LRCLIB] Synced found via exact match (with album)\n")
-		return resp, src, nil
+		return finish(resp, src)
 	}
 	fmt.Printf("   LRCLIB exact (with album): no synced\n")
 
@@ -292,7 +309,7 @@ func (c *LyricsClient) FetchLyricsAllSources(spotifyID, trackName, artistName, a
 		resp, src, found = check(resp, nil, "LRCLIB (no album)")
 		if found {
 			fmt.Printf("   [LRCLIB] Synced found via exact match (no album)\n")
-			return resp, src, nil
+			return finish(resp, src)
 		}
 		fmt.Printf("   LRCLIB exact (no album): no synced\n")
 	}
@@ -301,9 +318,19 @@ func (c *LyricsClient) FetchLyricsAllSources(spotifyID, trackName, artistName, a
 	resp, src, found = check(resp, nil, "LRCLIB Search")
 	if found {
 		fmt.Printf("   [LRCLIB] Synced found via search\n")
-		return resp, src, nil
+		return finish(resp, src)
 	}
 	fmt.Printf("   LRCLIB search: no synced\n")
+
+	if titleFallback {
+		resp, _ = c.FetchLyricsFromLRCLibSearch(trackName, "")
+		resp, src, found = check(resp, nil, "LRCLIB Title Search")
+		if found {
+			fmt.Printf("   [LRCLIB] Synced found via title-only search\n")
+			return finish(resp, src)
+		}
+		fmt.Printf("   LRCLIB title-only search: no synced\n")
+	}
 
 	simplifiedTrack := simplifyTrackName(trackName)
 	if simplifiedTrack != trackName {
@@ -313,20 +340,27 @@ func (c *LyricsClient) FetchLyricsAllSources(spotifyID, trackName, artistName, a
 		resp, src, found = check(resp, nil, "LRCLIB (simplified)")
 		if found {
 			fmt.Printf("   [LRCLIB] Synced found via simplified exact\n")
-			return resp, src, nil
+			return finish(resp, src)
 		}
 
 		resp, _ = c.FetchLyricsFromLRCLibSearch(simplifiedTrack, artistName)
 		resp, src, found = check(resp, nil, "LRCLIB Search (simplified)")
 		if found {
 			fmt.Printf("   [LRCLIB] Synced found via simplified search\n")
-			return resp, src, nil
+			return finish(resp, src)
+		}
+		if titleFallback {
+			resp, _ = c.FetchLyricsFromLRCLibSearch(simplifiedTrack, "")
+			resp, src, found = check(resp, nil, "LRCLIB Title Search (simplified)")
+			if found {
+				return finish(resp, src)
+			}
 		}
 	}
 
 	if unsyncedFallback != nil {
 		fmt.Printf("   [LRCLIB] No synced found, using unsynced from: %s\n", unsyncedSource)
-		return unsyncedFallback, unsyncedSource + " (unsynced)", nil
+		return finish(unsyncedFallback, unsyncedSource+" (unsynced)")
 	}
 
 	return nil, "", fmt.Errorf("lyrics not found in any source")
@@ -347,10 +381,16 @@ func (c *LyricsClient) ConvertToLRC(lyrics *LyricsResponse, trackName, artistNam
 
 		if line.StartTimeMs == "" {
 			sb.WriteString(fmt.Sprintf("%s\n", line.Words))
+			if line.Translation != "" {
+				sb.WriteString(fmt.Sprintf("%s\n", line.Translation))
+			}
 		} else {
 
 			timestamp := msToLRCTimestamp(line.StartTimeMs)
 			sb.WriteString(fmt.Sprintf("%s%s\n", timestamp, line.Words))
+			if line.Translation != "" {
+				sb.WriteString(fmt.Sprintf("%s%s\n", timestamp, line.Translation))
+			}
 		}
 	}
 
@@ -472,7 +512,8 @@ func (c *LyricsClient) DownloadLyrics(req LyricsDownloadRequest) (*LyricsDownloa
 		}
 	}
 
-	lyrics, _, err := c.FetchLyricsAllSources(req.SpotifyID, req.TrackName, req.ArtistName, req.AlbumName, audioDuration)
+	titleFallback := req.LRCLibTitleFallback == nil || *req.LRCLibTitleFallback
+	lyrics, _, err := c.FetchLyricsAllSources(req.SpotifyID, req.TrackName, req.ArtistName, req.AlbumName, audioDuration, titleFallback, req.LyricsTranslationMode, req.LyricsTranslationLang)
 	if err != nil {
 		return &LyricsDownloadResponse{
 			Success: false,

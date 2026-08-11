@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Trash2, ExternalLink, Search, ArrowUpDown, History, Play, Pause, Database, CloudUpload, Music2, Disc3, ListMusic, UserRound } from "lucide-react";
@@ -100,14 +101,14 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
     const ITEMS_PER_PAGE = 50;
     const getTrackLink = (spotifyId: string) => {
         if (spotifyId?.startsWith("tidal_"))
-            return { url: `https://listen.tidal.com/track/${spotifyId.replace("tidal_", "")}`, label: "Open in Tidal" };
+            return { url: `https://listen.tidal.com/track/${spotifyId.replace("tidal_", "")}`, label: t("translation.history.openTidal") };
         if (spotifyId?.startsWith("qobuz_"))
-            return { url: `https://www.qobuz.com/track/${spotifyId.replace("qobuz_", "")}`, label: "Open in Qobuz" };
+            return { url: `https://www.qobuz.com/track/${spotifyId.replace("qobuz_", "")}`, label: t("translation.history.openQobuz") };
         if (spotifyId?.startsWith("amazon_"))
-            return { url: `https://music.amazon.com/tracks/${spotifyId.replace("amazon_", "")}`, label: "Open in Amazon Music" };
+            return { url: `https://music.amazon.com/tracks/${spotifyId.replace("amazon_", "")}`, label: t("translation.history.openAmazonMusic") };
         if (spotifyId?.startsWith("deezer_"))
-            return { url: `https://www.deezer.com/track/${spotifyId.replace("deezer_", "")}`, label: "Open in Deezer" };
-        return { url: `https://open.spotify.com/track/${spotifyId}`, label: "Open in Spotify" };
+            return { url: `https://www.deezer.com/track/${spotifyId.replace("deezer_", "")}`, label: t("translation.history.openDeezer") };
+        return { url: `https://open.spotify.com/track/${spotifyId}`, label: t("translation.history.openSpotify") };
     };
     const getSourceIcon = (source: string) => {
         const s = source?.toLowerCase() || "";
@@ -302,36 +303,36 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                 <div className="flex flex-col gap-4">
                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                             <h2 className="text-xl font-bold tracking-tight">Downloads</h2>
+                             <h2 className="text-xl font-bold tracking-tight">{t("translation.history.downloads")}</h2>
                              {filteredDownloadHistory.length > 0 && (<Badge variant="secondary" className="font-mono">
                                     {filteredDownloadHistory.length.toLocaleString('en-US')}
                                 </Badge>)}
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => setShowClearDownloadConfirm(true)} disabled={downloadHistory.length === 0} className="cursor-pointer gap-2">
-                             <Trash2 className="h-4 w-4"/> Clear All
+                        <Button variant="destructive" size="sm" onClick={() => setShowClearDownloadConfirm(true)} disabled={downloadHistory.length === 0} className="cursor-pointer gap-2">
+                             <Trash2 className="h-4 w-4"/> {t("translation.common.clearAll")}
                         </Button>
                     </div>
 
                      <div className="flex items-center gap-2">
                         <div className="relative flex-1">
                             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"/>
-                            <Input placeholder="Search downloads..." value={downloadSearchQuery} onChange={(e) => setDownloadSearchQuery(e.target.value)} className="pl-8 h-9"/>
+                            <Input placeholder={t("translation.history.searchDownloads")} value={downloadSearchQuery} onChange={(e) => setDownloadSearchQuery(e.target.value)} className="pl-8 h-9"/>
                         </div>
                         <Select value={downloadSortBy} onValueChange={setDownloadSortBy}>
                             <SelectTrigger className="w-45 h-9">
                                 <ArrowUpDown className="mr-2 h-4 w-4"/>
-                                <SelectValue placeholder="Sort by"/>
+                                <SelectValue placeholder={t("translation.common.sortBy")}/>
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="default">Default</SelectItem>
-                                <SelectItem value="date_desc">Date (Newest)</SelectItem>
-                                <SelectItem value="date_asc">Date (Oldest)</SelectItem>
-                                <SelectItem value="title_asc">Title (A-Z)</SelectItem>
-                                <SelectItem value="title_desc">Title (Z-A)</SelectItem>
-                                <SelectItem value="artist_asc">Artist (A-Z)</SelectItem>
-                                <SelectItem value="artist_desc">Artist (Z-A)</SelectItem>
-                                <SelectItem value="duration_asc">Duration (Short)</SelectItem>
-                                <SelectItem value="duration_desc">Duration (Long)</SelectItem>
+                                <SelectItem value="default">{t("translation.common.default")}</SelectItem>
+                                <SelectItem value="date_desc">{t("translation.history.dateNewest")}</SelectItem>
+                                <SelectItem value="date_asc">{t("translation.history.dateOldest")}</SelectItem>
+                                <SelectItem value="title_asc">{t("translation.common.titleZ")}</SelectItem>
+                                <SelectItem value="title_desc">{t("translation.common.titleZ2")}</SelectItem>
+                                <SelectItem value="artist_asc">{t("translation.common.artistZ")}</SelectItem>
+                                <SelectItem value="artist_desc">{t("translation.common.artistZ2")}</SelectItem>
+                                <SelectItem value="duration_asc">{t("translation.common.durationShort")}</SelectItem>
+                                <SelectItem value="duration_desc">{t("translation.common.durationLong")}</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -343,25 +344,25 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                                 <History className="h-10 w-10 opacity-40"/>
                             </div>
                             <div className="space-y-1">
-                                <p className="font-medium text-foreground/80">No download history</p>
-                                <p className="text-sm">Your downloaded tracks will appear here.</p>
+                                <p className="font-medium text-foreground/80">{t("translation.history.noDownloadHistory")}</p>
+                                <p className="text-sm">{t("translation.history.downloadedTracksWillAppearHere")}</p>
                             </div>
                         </div>) : (<table className="w-full table-fixed">
                              <thead>
                                 <tr className="border-b bg-muted/50">
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground w-12 text-xs uppercase">#</th>
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground text-xs uppercase w-[35%]">Title</th>
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hidden md:table-cell text-xs uppercase w-48 lg:w-48 xl:w-56">Album</th>
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hidden lg:table-cell w-32 text-xs uppercase">Format</th>
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hidden xl:table-cell w-16 text-xs uppercase text-nowrap">Dur</th>
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hidden md:table-cell w-36 text-xs uppercase text-nowrap">Downloaded At</th>
-                                    <th className="h-10 px-4 text-center align-middle font-medium text-muted-foreground w-16 text-xs uppercase text-nowrap">Source</th>
-                                    <th className="h-10 px-4 text-center align-middle font-medium text-muted-foreground w-32 text-xs uppercase text-nowrap">Actions</th>
+                                    <th className="h-10 px-3 text-center align-middle font-medium text-muted-foreground w-12 text-xs uppercase">#</th>
+                                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs uppercase w-[35%]">{t("translation.common.title")}</th>
+                                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground hidden md:table-cell text-xs uppercase w-48 lg:w-48 xl:w-56">{t("translation.common.album")}</th>
+                                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground hidden lg:table-cell w-32 text-xs uppercase">{t("translation.common.format")}</th>
+                                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground hidden xl:table-cell w-16 text-xs uppercase text-nowrap">{t("translation.history.dur")}</th>
+                                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground hidden md:table-cell w-36 text-xs uppercase text-nowrap">{t("translation.history.downloaded")}</th>
+                                    <th className="h-10 px-3 text-center align-middle font-medium text-muted-foreground w-16 text-xs uppercase text-nowrap">{t("translation.history.source")}</th>
+                                    <th className="h-10 px-3 text-center align-middle font-medium text-muted-foreground w-32 text-xs uppercase text-nowrap">{t("translation.common.actions")}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginated.map((item, index) => (<tr key={item.id} className="border-b transition-colors hover:bg-muted/50">
-                                        <td className="p-3 align-middle text-sm text-muted-foreground text-left font-mono">
+                                        <td className="p-3 align-middle text-sm text-muted-foreground text-center font-mono">
                                             {startIndex + index + 1}
                                         </td>
                                         <td className="p-3 align-middle min-w-0">
@@ -403,7 +404,7 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                                                             </div>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            <p className="capitalize">{item.source || "Unknown"}</p>
+                                                            <p className="capitalize">{item.source || t("translation.backend.unknown")}</p>
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </TooltipProvider>
@@ -419,7 +420,7 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                                                                 </Button>
                                                             </TooltipTrigger>
                                                             <TooltipContent>
-                                                                <p>{playingPreviewId === item.id ? "Pause Preview" : "Play Preview"}</p>
+                                                                <p>{playingPreviewId === item.id ? t("translation.migrated.HistoryPage.pausePreview") : t("translation.migrated.HistoryPage.playPreview")}</p>
                                                             </TooltipContent>
                                                         </Tooltip>
                                                     </TooltipProvider>)}
@@ -445,7 +446,7 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                                                             </Button>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            <p>Delete</p>
+                                                            <p>{t("translation.history.delete")}</p>
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </TooltipProvider>
@@ -496,13 +497,13 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                 <div className="flex flex-col gap-4">
                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                             <h2 className="text-xl font-bold tracking-tight">Fetches</h2>
+                             <h2 className="text-xl font-bold tracking-tight">{t("translation.history.fetches")}</h2>
                              {fetchHistory.length > 0 && (<Badge variant="secondary" className="font-mono">
                                     {fetchHistory.length.toLocaleString('en-US')}
                                 </Badge>)}
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => setShowClearFetchConfirm(true)} disabled={fetchHistory.length === 0} className="cursor-pointer gap-2">
-                             <Trash2 className="h-4 w-4"/> Clear All
+                        <Button variant="destructive" size="sm" onClick={() => setShowClearFetchConfirm(true)} disabled={fetchHistory.length === 0} className="cursor-pointer gap-2">
+                             <Trash2 className="h-4 w-4"/> {t("translation.common.clearAll")}
                         </Button>
                     </div>
 
@@ -511,26 +512,26 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                         <div className="flex gap-2 border-b shrink-0">
                             <Button variant={activeFetchTab === "track" ? "default" : "ghost"} size="sm" onClick={() => setActiveFetchTab("track")} className="rounded-b-none">
                                 <Music2 className="h-4 w-4"/>
-                                Tracks
+                                {t("translation.common.tracks")}
                             </Button>
                             <Button variant={activeFetchTab === "album" ? "default" : "ghost"} size="sm" onClick={() => setActiveFetchTab("album")} className="rounded-b-none">
                                 <Disc3 className="h-4 w-4"/>
-                                Albums
+                                {t("translation.common.albums")}
                             </Button>
                             <Button variant={activeFetchTab === "playlist" ? "default" : "ghost"} size="sm" onClick={() => setActiveFetchTab("playlist")} className="rounded-b-none">
                                 <ListMusic className="h-4 w-4"/>
-                                Playlists
+                                {t("translation.common.playlists")}
                             </Button>
                             <Button variant={activeFetchTab === "artist" ? "default" : "ghost"} size="sm" onClick={() => setActiveFetchTab("artist")} className="rounded-b-none">
                                 <UserRound className="h-4 w-4"/>
-                                Artists
+                                {t("translation.common.artists")}
                             </Button>
                         </div>
 
                         <div className="flex items-center gap-2">
                             <div className="relative flex-1">
                                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"/>
-                                <Input placeholder="Search fetch history..." value={fetchSearchQuery} onChange={(e) => setFetchSearchQuery(e.target.value)} className="pl-8 h-9"/>
+                                <Input placeholder={t("translation.history.searchFetchHistory")} value={fetchSearchQuery} onChange={(e) => setFetchSearchQuery(e.target.value)} className="pl-8 h-9"/>
                             </div>
                         </div>
                     </div>
@@ -540,24 +541,24 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                    {paginated.length === 0 ? (<div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground gap-3"> 
                             <Database className="h-10 w-10 opacity-40"/>
                             <div className="space-y-1">
-                                <p className="font-medium text-foreground/80">No fetch history</p>
-                                <p className="text-sm">Fetched metadata will appear here.</p>
+                                <p className="font-medium text-foreground/80">{t("translation.history.noFetchHistory")}</p>
+                                <p className="text-sm">{t("translation.history.fetchedMetadataWillAppearHere")}</p>
                             </div>
                        </div>) : (<table className="w-full table-fixed">
                             <thead>
                                 <tr className="border-b bg-muted/50">
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground w-12 text-xs uppercase">#</th>
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground text-xs uppercase w-1/3">
-                                        {activeFetchTab === 'artist' ? 'Name' : 'Title'}
+                                    <th className="h-10 px-3 text-center align-middle font-medium text-muted-foreground w-12 text-xs uppercase">#</th>
+                                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs uppercase w-1/3">
+                                        {activeFetchTab === 'artist' ? t("translation.migrated.HistoryPage.name") : t("translation.migrated.HistoryPage.title")}
                                     </th>
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hidden md:table-cell text-xs uppercase">Details</th>
-                                    <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground hidden lg:table-cell w-40 text-xs uppercase text-nowrap">Fetched At</th>
-                                    <th className="h-10 px-4 text-center align-middle font-medium text-muted-foreground w-32 text-xs uppercase text-nowrap">Actions</th>
+                                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground hidden md:table-cell text-xs uppercase">{t("translation.common.details")}</th>
+                                    <th className="h-10 px-3 text-left align-middle font-medium text-muted-foreground hidden lg:table-cell w-40 text-xs uppercase text-nowrap">{t("translation.history.fetched")}</th>
+                                    <th className="h-10 px-3 text-center align-middle font-medium text-muted-foreground w-32 text-xs uppercase text-nowrap">{t("translation.common.actions")}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginated.map((item, index) => (<tr key={item.id} className="border-b transition-colors hover:bg-muted/50">
-                                        <td className="p-3 align-middle text-sm text-muted-foreground text-left font-mono">
+                                        <td className="p-3 align-middle text-sm text-muted-foreground text-center font-mono">
                                             {startIndex + index + 1}
                                         </td>
                                         <td className="p-3 align-middle min-w-0">
@@ -568,7 +569,7 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                                                         </div>)}
                                                 </div>
                                                 <span className="font-medium text-sm truncate flex items-center gap-2">
-                                                    {item.is_explicit && (<span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-red-600 text-[10px] text-white" title="Explicit">E</span>)}
+                                                    {item.is_explicit && (<span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-red-600 text-[10px] text-white" title={t("translation.common.explicit")}>E</span>)}
                                                     <span className="truncate">{item.name}</span>
                                                 </span>
                                             </div>
@@ -592,7 +593,7 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                                                             </Button>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            <p>Load</p>
+                                                            <p>{t("translation.common.load")}</p>
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </TooltipProvider>
@@ -605,7 +606,7 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
                                                             </Button>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            <p>Delete</p>
+                                                            <p>{t("translation.history.delete")}</p>
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </TooltipProvider>
@@ -650,16 +651,16 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
     };
     return (<div className="space-y-6">
             <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-bold">History</h1>
+                <h1 className="text-2xl font-bold">{t("translation.common.history")}</h1>
             </div>
 
             <div className="border-b">
                 <div className="flex gap-6">
                     <button onClick={() => setActiveTab("downloads")} className={`pb-3 text-sm font-medium transition-colors border-b-2 -mb-px hover:text-foreground ${activeTab === "downloads" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}>
-                        Downloads
+                        {t("translation.history.downloads")}
                     </button>
                     <button onClick={() => setActiveTab("fetches")} className={`pb-3 text-sm font-medium transition-colors border-b-2 -mb-px hover:text-foreground ${activeTab === "fetches" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}>
-                        Fetches
+                        {t("translation.history.fetches")}
                     </button>
                 </div>
             </div>
@@ -675,16 +676,15 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
             <Dialog open={showClearDownloadConfirm} onOpenChange={setShowClearDownloadConfirm}>
                 <DialogContent className="max-w-md [&>button]:hidden">
                     <DialogHeader>
-                        <DialogTitle>Clear Download History?</DialogTitle>
+                        <DialogTitle>{t("translation.history.clearDownloadHistory")}</DialogTitle>
                         <DialogDescription>
-                            This will remove all entries from your download history. This action cannot be undone.
-                            Note: The actual downloaded files will NOT be deleted.
+                            {t("translation.migrated.HistoryPage.thisWillRemoveAllEntriesFromYour")}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowClearDownloadConfirm(false)} className="cursor-pointer">Cancel</Button>
+                        <Button variant="outline" onClick={() => setShowClearDownloadConfirm(false)} className="cursor-pointer">{t("translation.common.cancel")}</Button>
                         <Button variant="destructive" onClick={handleClearDownloadHistory} className="cursor-pointer">
-                            Clear History
+                            {t("translation.common.clearHistory")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -693,15 +693,15 @@ export function HistoryPage({ onHistorySelect }: HistoryPageProps) {
             <Dialog open={showClearFetchConfirm} onOpenChange={setShowClearFetchConfirm}>
                 <DialogContent className="max-w-md [&>button]:hidden">
                     <DialogHeader>
-                        <DialogTitle>Clear {activeFetchTab.charAt(0).toUpperCase() + activeFetchTab.slice(1)} History?</DialogTitle>
+                        <DialogTitle>{t("translation.common.clear")} {activeFetchTab.charAt(0).toUpperCase() + activeFetchTab.slice(1)} {t("translation.history.history")}</DialogTitle>
                         <DialogDescription>
-                            This will remove all {activeFetchTab} entries from your fetch history cache.
+                            {t("translation.history.willRemoveAll")} {activeFetchTab} {t("translation.history.entriesFetchHistoryCache")}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowClearFetchConfirm(false)} className="cursor-pointer">Cancel</Button>
+                        <Button variant="outline" onClick={() => setShowClearFetchConfirm(false)} className="cursor-pointer">{t("translation.common.cancel")}</Button>
                         <Button variant="destructive" onClick={handleClearFetchHistory} className="cursor-pointer">
-                            Clear History
+                            {t("translation.common.clearHistory")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

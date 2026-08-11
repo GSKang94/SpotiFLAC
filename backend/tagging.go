@@ -32,17 +32,16 @@ type MetadataTagSelection struct {
 
 func TagFile(filePath string, metadata Metadata, coverPath string) error {
 	filePath = norm.NFC.String(filePath)
+	if coverPath != "" && fileExists(coverPath) {
+		if err := writeTagImage(filePath, coverPath); err != nil {
+			fmt.Printf("Warning: failed to write cover art: %v\n", err)
+		}
+	}
 
 	tags := buildTagMap(filePath, metadata)
 	if len(tags) > 0 {
 		if err := taglib.WriteTags(filePath, tags, taglib.Clear); err != nil {
 			return fmt.Errorf("failed to write tags: %w", err)
-		}
-	}
-
-	if coverPath != "" && fileExists(coverPath) {
-		if err := writeTagImage(filePath, coverPath); err != nil {
-			fmt.Printf("Warning: failed to write cover art: %v\n", err)
 		}
 	}
 
@@ -196,6 +195,48 @@ func buildTagMap(filePath string, metadata Metadata) map[string][]string {
 	addTag(taglib.Comment, resolveMetadataComment(metadata))
 
 	return tags
+}
+
+func normalizeMetadataDate(value, format string) string {
+	value = strings.TrimSpace(value)
+	if format != "year" {
+		return value
+	}
+	for index := 0; index+4 <= len(value); index++ {
+		year := value[index : index+4]
+		if parsed, err := strconv.Atoi(year); err == nil && parsed >= 1000 && parsed <= 9999 {
+			return year
+		}
+	}
+	return value
+}
+
+func ApplyMetadataDateFormat(filePath, format string) error {
+	filePath = norm.NFC.String(filePath)
+	tags, err := taglib.ReadTags(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read tags: %w", err)
+	}
+	date := firstTagValue(tags, taglib.Date)
+	if date == "" {
+		date = firstTagValue(tags, taglib.ReleaseDate)
+	}
+	if date == "" {
+		date = firstTagValue(tags, "YEAR")
+	}
+	for key := range tags {
+		normalizedKey := strings.ToUpper(strings.TrimSpace(key))
+		if normalizedKey == "YEAR" || normalizedKey == strings.ToUpper(taglib.ReleaseDate) {
+			delete(tags, key)
+		}
+	}
+	if date = normalizeMetadataDate(date, format); date != "" {
+		tags[taglib.Date] = []string{date}
+	}
+	if err := taglib.WriteTags(filePath, tags, taglib.Clear); err != nil {
+		return fmt.Errorf("failed to write date tags: %w", err)
+	}
+	return nil
 }
 
 func writeTagImage(filePath string, coverPath string) error {
@@ -518,8 +559,12 @@ func hasMeaningfulMetadata(m Metadata) bool {
 }
 
 func mergeExtractedMetadata(primary, fallback Metadata) Metadata {
-	if primary.Title == "" {
-		primary.Title = fallback.Title
+	if primary.Title == "" || isArtworkPlaceholderTitle(primary.Title) {
+		if !isArtworkPlaceholderTitle(fallback.Title) {
+			primary.Title = fallback.Title
+		} else {
+			primary.Title = ""
+		}
 	}
 	if primary.Artist == "" {
 		primary.Artist = fallback.Artist

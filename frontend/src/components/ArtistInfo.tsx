@@ -1,6 +1,7 @@
+import { t, translateMessage } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Download, FolderOpen, ImageDown, FileText, BadgeCheck, XCircle, Filter, CloudDownload, CheckCheck } from "lucide-react";
+import { Download, FolderOpen, ImageDown, FileText, BadgeCheck, XCircle, Filter, CloudDownload, CheckCheck, ListPlus, Check } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SearchAndSort } from "./SearchAndSort";
@@ -14,6 +15,8 @@ import { useState, useMemo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useQueueFeedback } from "@/hooks/useQueueFeedback";
+import { addCollectionToQueue } from "@/lib/queue";
 interface ArtistInfoProps {
     artistInfo: {
         name: string;
@@ -82,6 +85,9 @@ interface ArtistInfoProps {
     onDownloadAllCovers?: () => void;
     onDownloadAll: () => void;
     onDownloadSelected: () => void;
+    onQueueAll?: () => void;
+    onQueueSelected?: () => void;
+    onQueueTrack?: (track: TrackMetadata, position?: number) => void;
     onStopDownload: () => void;
     onOpenFolder: () => void;
     onAlbumClick: (album: {
@@ -98,7 +104,8 @@ interface ArtistInfoProps {
     onTrackClick?: (track: TrackMetadata) => void;
     onBack?: () => void;
 }
-export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sortBy, selectedTracks, downloadedTracks, failedTracks, skippedTracks, downloadingTrack, isDownloading, bulkDownloadType, downloadProgress, downloadRemainingCount, currentDownloadInfo, currentPage, itemsPerPage, downloadedLyrics, failedLyrics, skippedLyrics, downloadingLyricsTrack, checkingAvailabilityTrack, availabilityMap, downloadedCovers, failedCovers, skippedCovers, downloadingCoverTrack, isBulkDownloadingCovers, isBulkDownloadingLyrics, isMetadataLoading = false, onSearchChange, onSortChange, onToggleTrack, onToggleSelectAll, onSelectTrackRange, onDownloadTrack, onDownloadLyrics, onDownloadCover, onCheckAvailability, onDownloadAllLyrics, onDownloadAllCovers, onDownloadAll, onDownloadSelected, onStopDownload, onOpenFolder, onAlbumClick, onArtistClick, onPageChange, onTrackClick, onBack, }: ArtistInfoProps) {
+export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sortBy, selectedTracks, downloadedTracks, failedTracks, skippedTracks, downloadingTrack, isDownloading, bulkDownloadType, downloadProgress, downloadRemainingCount, currentDownloadInfo, currentPage, itemsPerPage, downloadedLyrics, failedLyrics, skippedLyrics, downloadingLyricsTrack, checkingAvailabilityTrack, availabilityMap, downloadedCovers, failedCovers, skippedCovers, downloadingCoverTrack, isBulkDownloadingCovers, isBulkDownloadingLyrics, isMetadataLoading = false, onSearchChange, onSortChange, onToggleTrack, onToggleSelectAll, onSelectTrackRange, onDownloadTrack, onDownloadLyrics, onDownloadCover, onCheckAvailability, onDownloadAllLyrics, onDownloadAllCovers, onDownloadAll, onDownloadSelected, onQueueAll, onQueueSelected, onQueueTrack, onStopDownload, onOpenFolder, onAlbumClick, onArtistClick, onPageChange, onTrackClick, onBack, }: ArtistInfoProps) {
+    const { flashQueued, isQueued } = useQueueFeedback();
     const [downloadingHeader, setDownloadingHeader] = useState(false);
     const [downloadingAvatar, setDownloadingAvatar] = useState(false);
     const [downloadingGalleryIndex, setDownloadingGalleryIndex] = useState<number | null>(null);
@@ -112,12 +119,12 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
     const totalTrackCount = albumList.reduce((sum, album) => sum + (album.total_tracks || 0), 0);
     const fetchedTrackCount = trackList.length;
     const albumCountLabel = isMetadataLoading && totalAlbumCount > 0 && fetchedAlbumCount < totalAlbumCount
-        ? `${fetchedAlbumCount.toLocaleString()} / ${totalAlbumCount.toLocaleString()} albums`
-        : `${displayedAlbumCount.toLocaleString()} ${displayedAlbumCount === 1 ? "album" : "albums"}`;
+        ? `${fetchedAlbumCount.toLocaleString()} / ${totalAlbumCount.toLocaleString()} ${t("translation.common.albums")}`
+        : `${displayedAlbumCount.toLocaleString()} ${displayedAlbumCount === 1 ? t("translation.common.album") : t("translation.common.albums")}`;
     const resolvedTrackCount = totalTrackCount > 0 ? totalTrackCount : fetchedTrackCount;
     const trackCountLabel = isMetadataLoading && totalTrackCount > 0 && fetchedTrackCount < totalTrackCount
-        ? `${fetchedTrackCount.toLocaleString()} / ${totalTrackCount.toLocaleString()} tracks`
-        : `${resolvedTrackCount.toLocaleString()} ${resolvedTrackCount === 1 ? "track" : "tracks"}`;
+        ? `${fetchedTrackCount.toLocaleString()} / ${totalTrackCount.toLocaleString()} ${t("translation.artistInfo.tracks")}`
+        : `${resolvedTrackCount.toLocaleString()} ${resolvedTrackCount === 1 ? t("translation.artistInfo.track") : t("translation.artistInfo.tracks")}`;
     const albumFilterCounts = useMemo(() => {
         const counts = new Map<string, number>();
         counts.set("all", (albumList || []).length);
@@ -148,6 +155,28 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
     const discographyTracksWithId = useMemo(() => discographyTracks.filter((track) => track.spotify_id), [discographyTracks]);
     const allDiscographySelected = discographyTracksWithId.length > 0 &&
         discographyTracksWithId.every((track) => selectedTracks.includes(track.spotify_id!));
+    const queueSelectedAlbums = () => {
+        const selected = (trackList || []).filter((track) => track.spotify_id && selectedTracks.includes(track.spotify_id));
+        const groups = new Map<string, TrackMetadata[]>();
+        for (const track of selected) {
+            const key = track.album_id || track.album_name;
+            if (key)
+                groups.set(key, [...(groups.get(key) || []), track]);
+        }
+        let added = 0;
+        for (const tracks of groups.values()) {
+            const first = tracks[0];
+            added += addCollectionToQueue({
+                type: "album", name: first.album_name, artist: first.album_artist || first.artists,
+                info: `${tracks.length} ${t("translation.common.tracks")}`, image: first.images || "",
+                folderName: first.album_name, isAlbum: true, tracks,
+            }).added;
+        }
+        if (added > 0)
+            toast.success(t("translation.queue.addedValue1Queue", { value1: `${added} ${t("translation.common.albums")}` }));
+        else
+            toast.info(t("translation.queue.alreadyInQueue"));
+    };
     const filteredAlbumGroups = useMemo(() => {
         const albumTypeMap = new Map(albumList.map(a => [a.id, a.album_type]));
         const albumGroups = trackList.reduce((acc, track) => {
@@ -180,12 +209,18 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
     const formatAlbumFilterLabel = (value: string) => {
         const count = albumFilterCounts.get(value) || 0;
         if (value === "all")
-            return `All (${count})`;
-        const label = value
-            .split(/[_\s]+/)
-            .filter(Boolean)
-            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-            .join(" ");
+            return `${t("translation.queue.all")} (${count})`;
+        const filterKeys: Record<string, string> = {
+            album: "translation.common.albums",
+            live: "translation.artistInfo.liveAlbums",
+            compilation: "translation.artistInfo.compilations",
+            single: "translation.artistInfo.singlesEps",
+            ep: "translation.artistInfo.singlesEps",
+            epsingle: "translation.artistInfo.singlesEps",
+            appears_on: "translation.artistInfo.otherReleases",
+            other: "translation.artistInfo.otherReleases",
+        };
+        const label = filterKeys[value] ? t(filterKeys[value]) : value;
         return `${label} (${count})`;
     };
     const handleDownloadHeader = async () => {
@@ -201,18 +236,18 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
             });
             if (response.success) {
                 if (response.already_exists) {
-                    toast.info("Header already exists");
+                    toast.info(t("translation.artistInfo.headerAlreadyExists"));
                 }
                 else {
-                    toast.success("Header downloaded successfully");
+                    toast.success(t("translation.artistInfo.headerDownloadedSuccessfully"));
                 }
             }
             else {
-                toast.error(response.error || "Failed to download header");
+                toast.error(translateMessage(response.error || t("translation.artistInfo.failedDownloadHeader")));
             }
         }
         catch (error) {
-            toast.error(`Error downloading header: ${error}`);
+            toast.error(t("translation.migrated.ArtistInfo.errorDownloadingHeader", { value1: error }));
         }
         finally {
             setDownloadingHeader(false);
@@ -231,18 +266,18 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
             });
             if (response.success) {
                 if (response.already_exists) {
-                    toast.info("Avatar already exists");
+                    toast.info(t("translation.artistInfo.avatarAlreadyExists"));
                 }
                 else {
-                    toast.success("Avatar downloaded successfully");
+                    toast.success(t("translation.artistInfo.avatarDownloadedSuccessfully"));
                 }
             }
             else {
-                toast.error(response.error || "Failed to download avatar");
+                toast.error(translateMessage(response.error || t("translation.artistInfo.failedDownloadAvatar")));
             }
         }
         catch (error) {
-            toast.error(`Error downloading avatar: ${error}`);
+            toast.error(t("translation.migrated.ArtistInfo.errorDownloadingAvatar", { value1: error }));
         }
         finally {
             setDownloadingAvatar(false);
@@ -260,18 +295,18 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
             });
             if (response.success) {
                 if (response.already_exists) {
-                    toast.info(`Gallery image ${index + 1} already exists`);
+                    toast.info(t("translation.migrated.ArtistInfo.galleryImageAlreadyExists", { value1: index + 1 }));
                 }
                 else {
-                    toast.success(`Gallery image ${index + 1} downloaded successfully`);
+                    toast.success(t("translation.migrated.ArtistInfo.galleryImageDownloadedSuccessfully", { value1: index + 1 }));
                 }
             }
             else {
-                toast.error(response.error || `Failed to download gallery image ${index + 1}`);
+                toast.error(translateMessage(response.error || t("translation.artistInfo.failedDownloadGalleryImageValue1", { value1: index + 1 })));
             }
         }
         catch (error) {
-            toast.error(`Error downloading gallery image ${index + 1}: ${error}`);
+            toast.error(t("translation.migrated.ArtistInfo.errorDownloadingGalleryImage", { value1: index + 1, value2: error }));
         }
         finally {
             setDownloadingGalleryIndex(null);
@@ -313,21 +348,21 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
             }
             if (failCount === 0) {
                 if (existsCount > 0 && successCount > 0) {
-                    toast.success(`${successCount} images downloaded, ${existsCount} already existed`);
+                    toast.success(t("translation.migrated.ArtistInfo.imagesDownloadedAlreadyExisted", { value1: successCount, value2: existsCount }));
                 }
                 else if (existsCount > 0) {
-                    toast.info(`All ${existsCount} images already exist`);
+                    toast.info(t("translation.migrated.ArtistInfo.allImagesAlreadyExist", { value1: existsCount }));
                 }
                 else {
-                    toast.success(`All ${successCount} gallery images downloaded successfully`);
+                    toast.success(t("translation.migrated.ArtistInfo.allGalleryImagesDownloadedSuccessfully", { value1: successCount }));
                 }
             }
             else {
-                toast.error(`${failCount} images failed to download`);
+                toast.error(t("translation.migrated.ArtistInfo.imagesFailedToDownload", { value1: failCount }));
             }
         }
         catch (error) {
-            toast.error(`Error downloading gallery images: ${error}`);
+            toast.error(t("translation.migrated.ArtistInfo.errorDownloadingGalleryImages", { value1: error }));
         }
         finally {
             setDownloadingAllGallery(false);
@@ -353,7 +388,7 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Download Header</p>
+                    <p>{t("translation.artistInfo.downloadHeader")}</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -369,13 +404,13 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Download Avatar</p>
+                            <p>{t("translation.artistInfo.downloadAvatar")}</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
                     </div>)}
                   <div className="flex-1 space-y-2">
-                    <p className="text-sm font-medium text-white/80">Artist</p>
+                    <p className="text-sm font-medium text-white/80">{t("translation.common.artist")}</p>
                     <div className="flex items-center gap-2">
                       <h2 className="text-4xl font-bold text-white">{artistInfo.name}</h2>
                       {artistInfo.verified && (<BadgeCheck className="h-6 w-6 text-white fill-blue-400 shrink-0"/>)}
@@ -383,13 +418,13 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                     {artistInfo.biography && (<p className="text-sm text-white/90 line-clamp-4">{artistInfo.biography}</p>)}
                     <div className="flex items-center gap-2 text-sm flex-wrap text-white/90">
                       {artistInfo.rank && (<>
-                          <span>#{artistInfo.rank} rank</span>
+                          <span>#{artistInfo.rank} {t("translation.migrated.ArtistInfo.rank")}</span>
                           <span>•</span>
                         </>)}
-                      <span>{artistInfo.followers.toLocaleString()} {artistInfo.followers === 1 ? "follower" : "followers"}</span>
+                      <span>{artistInfo.followers.toLocaleString()} {artistInfo.followers === 1 ? t("translation.migrated.ArtistInfo.follower") : t("translation.migrated.ArtistInfo.followers")}</span>
                       {artistInfo.listeners && (<>
                           <span>•</span>
-                          <span>{artistInfo.listeners.toLocaleString()} {artistInfo.listeners === 1 ? "listener" : "listeners"}</span>
+                          <span>{artistInfo.listeners.toLocaleString()} {artistInfo.listeners === 1 ? t("translation.migrated.ArtistInfo.listener") : t("translation.migrated.ArtistInfo.listeners")}</span>
                         </>)}
                     </div>
                     <div className="flex items-center gap-2 text-sm flex-wrap text-white/90">
@@ -422,13 +457,13 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Download Avatar</p>
+                        <p>{t("translation.artistInfo.downloadAvatar")}</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
                 </div>)}
               <div className="flex-1 space-y-2">
-                <p className="text-sm font-medium">Artist</p>
+                <p className="text-sm font-medium">{t("translation.common.artist")}</p>
                 <div className="flex items-center gap-2">
                   <h2 className="text-4xl font-bold">{artistInfo.name}</h2>
                   {artistInfo.verified && (<BadgeCheck className="h-6 w-6 text-white fill-blue-500 shrink-0"/>)}
@@ -436,13 +471,13 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                 {artistInfo.biography && (<p className="text-sm text-muted-foreground line-clamp-4">{artistInfo.biography}</p>)}
                 <div className="flex items-center gap-2 text-sm flex-wrap">
                   {artistInfo.rank && (<>
-                      <span>#{artistInfo.rank} rank</span>
+                      <span>#{artistInfo.rank} {t("translation.migrated.ArtistInfo.rank")}</span>
                       <span>•</span>
                     </>)}
-                  <span>{artistInfo.followers.toLocaleString()} {artistInfo.followers === 1 ? "follower" : "followers"}</span>
+                  <span>{artistInfo.followers.toLocaleString()} {artistInfo.followers === 1 ? t("translation.migrated.ArtistInfo.follower") : t("translation.migrated.ArtistInfo.followers")}</span>
                   {artistInfo.listeners && (<>
                       <span>•</span>
-                      <span>{artistInfo.listeners.toLocaleString()} {artistInfo.listeners === 1 ? "listener" : "listeners"}</span>
+                      <span>{artistInfo.listeners.toLocaleString()} {artistInfo.listeners === 1 ? t("translation.migrated.ArtistInfo.listener") : t("translation.migrated.ArtistInfo.listeners")}</span>
                     </>)}
                 </div>
                 <div className="flex items-center gap-2 text-sm flex-wrap">
@@ -462,20 +497,20 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
       <div className="border-b">
         <div className="flex gap-6">
             <button onClick={() => setActiveTab("albums")} className={`pb-3 text-sm font-medium transition-colors border-b-2 -mb-px hover:text-foreground ${activeTab === "albums" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}>
-                Albums
+                {t("translation.common.albums")}
             </button>
             <button onClick={() => setActiveTab("tracks")} className={`pb-3 text-sm font-medium transition-colors border-b-2 -mb-px hover:text-foreground ${activeTab === "tracks" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}>
-                All Tracks
+                {t("translation.artistInfo.allTracks")}
             </button>
             {hasGallery && (<button onClick={() => setActiveTab("gallery")} className={`pb-3 text-sm font-medium transition-colors border-b-2 -mb-px hover:text-foreground ${activeTab === "gallery" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}>
-                    Gallery
+                    {t("translation.artistInfo.gallery")}
                 </button>)}
         </div>
       </div>
 
       {activeTab === "gallery" && hasGallery && (<div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold">Gallery ({artistInfo.gallery!.length.toLocaleString()})</h3>
+            <h3 className="text-2xl font-bold">{t("translation.artistInfo.gallery2")}{artistInfo.gallery!.length.toLocaleString()})</h3>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button onClick={handleDownloadAllGallery} size="sm" variant="outline" disabled={downloadingAllGallery}>
@@ -483,14 +518,14 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Download All Gallery</p>
+                <p>{t("translation.artistInfo.downloadAllGallery")}</p>
               </TooltipContent>
             </Tooltip>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {artistInfo.gallery!.map((imageUrl, index) => (<div key={`${imageUrl}-${index}`} className="relative group">
                 <div className="relative aspect-square rounded-md overflow-hidden shadow-md">
-                  <img src={imageUrl} alt={`${artistInfo.name} gallery ${index + 1}`} className="w-full h-full object-cover"/>
+                  <img src={imageUrl} alt={t("translation.migrated.ArtistInfo.gallery", { value1: artistInfo.name, value2: index + 1 })} className="w-full h-full object-cover"/>
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center">
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -499,7 +534,7 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Download Image {index + 1}</p>
+                        <p>{t("translation.artistInfo.downloadImage")} {index + 1}</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -510,19 +545,21 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
 
       {activeTab === "albums" && albumList.length > 0 && (<div className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-2xl font-bold">Discography</h3>
+            <h3 className="text-2xl font-bold">{t("translation.artistInfo.discography")}</h3>
             <div className="flex gap-2">
                 {discographyTracksWithId.length > 0 && (<Button onClick={() => onToggleSelectAll(discographyTracks)} size="sm" variant="outline">
                     <CheckCheck className="h-4 w-4"/>
-                    {allDiscographySelected ? "Deselect All" : "Select All"}
+                    {allDiscographySelected ? t("translation.migrated.ArtistInfo.deselectAll") : t("translation.migrated.ArtistInfo.selectAll")}
                 </Button>)}
                 <Button onClick={onDownloadAll} size="sm" disabled={isDownloading}>
                     {isDownloading && bulkDownloadType === "all" ? (<Spinner />) : (<Download className="h-4 w-4"/>)}
-                    Download Discography
+                    {t("translation.artistInfo.downloadDiscography")}
                 </Button>
+                {onQueueAll && (<Button onClick={() => { onQueueAll(); flashQueued("all"); }} size="sm" variant="outline">{isQueued("all") ? (<Check className="h-4 w-4 text-green-500"/>) : (<ListPlus className="h-4 w-4"/>)}{t("translation.queue.addDiscographyQueue")}</Button>)}
+                {selectedTracks.length > 0 && onQueueSelected && (<Button onClick={() => { queueSelectedAlbums(); flashQueued("selected"); }} size="sm" variant="outline">{isQueued("selected") ? (<Check className="h-4 w-4 text-green-500"/>) : (<ListPlus className="h-4 w-4"/>)}{t("translation.queue.addSelectedQueueValue1", { value1: selectedTracks.length.toLocaleString() })}</Button>)}
                 {selectedTracks.length > 0 && (<Button onClick={onDownloadSelected} size="sm" variant="secondary" disabled={isDownloading}>
                         {isDownloading && bulkDownloadType === "selected" ? (<Spinner />) : (<Download className="h-4 w-4"/>)}
-                        Download Selected ({selectedTracks.length})
+                        {t("translation.migrated.ArtistInfo.downloadSelected")}{selectedTracks.length})
                     </Button>)}
             </div>
           </div>
@@ -567,7 +604,7 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                         }
                         event.preventDefault();
                         handleFetch();
-                    }} role="button" tabIndex={0} aria-label={`Select album ${album.name}`}>
+                    }} role="button" tabIndex={0} aria-label={t("translation.migrated.ArtistInfo.selectAlbum", { value1: album.name })}>
                 <div className="relative mb-2">
                   {hasTracks && (<div className={`absolute top-2 left-2 z-20 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                         <Checkbox checked={isSelected} onCheckedChange={() => onToggleSelectAll(albumTracks)} onClick={(e) => e.stopPropagation()} className="bg-black/50 border-white/70 data-[state=checked]:bg-primary data-[state=checked]:border-primary"/>
@@ -580,7 +617,7 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Fetch Album</p>
+                        <p>{t("translation.common.fetchAlbum")}</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -592,38 +629,38 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                   </div>
                 </div>
                 <h4 className="font-semibold truncate text-sm flex items-center gap-2">
-                  {album.is_explicit && (<span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-red-600 text-[10px] text-white" title="Explicit">E</span>)}
+                  {album.is_explicit && (<span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-red-600 text-[10px] text-white" title={t("translation.common.explicit")}>E</span>)}
                   <span className="truncate">{album.name}</span>
                 </h4>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                     <span>{album.release_date?.split("-")[0]}</span>
                     {album.total_tracks && (<>
                             <span>•</span>
-                            <span>{album.total_tracks} {album.total_tracks === 1 ? "track" : "tracks"}</span>
+                            <span>{album.total_tracks} {album.total_tracks === 1 ? t("translation.migrated.ArtistInfo.track") : t("translation.migrated.ArtistInfo.tracks")}</span>
                         </>)}
                 </div>
               </div>);
             })}
           </div>
           {filteredAlbums.length === 0 && (<div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
-              No releases found for the selected discography filter.
+              {t("translation.artistInfo.noReleasesFoundSelectedDiscography")}
             </div>)}
         </div>)}
 
       {activeTab === "tracks" && trackList.length > 0 && (<div className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-2xl font-bold">All Tracks</h3>
+            <h3 className="text-2xl font-bold">{t("translation.artistInfo.allTracks")}</h3>
             <div className="flex gap-2 flex-wrap">
               <Dialog>
                   <DialogTrigger asChild>
                       <Button variant="outline" size="sm">
                           <Filter className="h-4 w-4"/>
-                          Filter Albums
+                          {t("translation.migrated.ArtistInfo.filterAlbums")}
                       </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-125 h-[80vh] flex flex-col">
                       <DialogHeader>
-                          <DialogTitle>Select Albums</DialogTitle>
+                          <DialogTitle>{t("translation.migrated.ArtistInfo.selectAlbums")}</DialogTitle>
                       </DialogHeader>
                       <ScrollArea className="flex-1 pr-4">
                           <div className="space-y-4">
@@ -641,9 +678,9 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                                                       {data.type}
                                                   </span>
                                                   <span>•</span>
-                                                  <span>{data.count} tracks</span>
+                                                  <span>{data.count} {t("translation.artistInfo.tracks")}</span>
                                                   <span>•</span>
-                                                  <span>{data.tracks[0]?.release_date?.split('-')[0] || 'Unknown Year'}</span>
+                                                  <span>{data.tracks[0]?.release_date?.split('-')[0] || t("translation.artistInfo.unknownYear")}</span>
                                               </div>
                                           </div>
                                       </div>);
@@ -654,30 +691,30 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
               </Dialog>
               <Button onClick={onDownloadAll} size="sm" disabled={isDownloading}>
                 {isDownloading && bulkDownloadType === "all" ? (<Spinner />) : (<Download className="h-4 w-4"/>)}
-                Download All
+                {t("translation.albumInfo.downloadAll")}
               </Button>
               {selectedTracks.length > 0 && (<Button onClick={onDownloadSelected} size="sm" variant="secondary" disabled={isDownloading}>
                   {isDownloading && bulkDownloadType === "selected" ? (<Spinner />) : (<Download className="h-4 w-4"/>)}
-                  Download Selected ({selectedTracks.length.toLocaleString()})
+                  {t("translation.migrated.ArtistInfo.downloadSelected")}{selectedTracks.length.toLocaleString()})
                 </Button>)}
               {onDownloadAllLyrics && (<Tooltip>
                   <TooltipTrigger asChild>
-                    <Button onClick={onDownloadAllLyrics} size="sm" variant="outline" disabled={isBulkDownloadingLyrics}>
+                    <Button onClick={onDownloadAllLyrics} size="icon-sm" variant="outline" disabled={isBulkDownloadingLyrics}>
                       {isBulkDownloadingLyrics ? <Spinner /> : <FileText className="h-4 w-4"/>}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Download All Lyrics</p>
+                    <p>{t("translation.common.downloadAllLyrics")}</p>
                   </TooltipContent>
                 </Tooltip>)}
               {onDownloadAllCovers && (<Tooltip>
                   <TooltipTrigger asChild>
-                    <Button onClick={onDownloadAllCovers} size="sm" variant="outline" disabled={isBulkDownloadingCovers}>
+                    <Button onClick={onDownloadAllCovers} size="icon-sm" variant="outline" disabled={isBulkDownloadingCovers}>
                       {isBulkDownloadingCovers ? <Spinner /> : <ImageDown className="h-4 w-4"/>}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Download All Separate Covers</p>
+                    <p>{t("translation.common.downloadAllSeparateCovers")}</p>
                   </TooltipContent>
                 </Tooltip>)}
               {downloadedTracks.size > 0 && (<Tooltip>
@@ -687,14 +724,14 @@ export function ArtistInfo({ artistInfo, albumList, trackList, searchQuery, sort
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Open Folder</p>
+                    <p>{t("translation.common.openFolder")}</p>
                   </TooltipContent>
                 </Tooltip>)}
             </div>
           </div>
           {isDownloading && (<DownloadProgress progress={downloadProgress} remainingCount={downloadRemainingCount} currentTrack={currentDownloadInfo} onStop={onStopDownload}/>)}
           <SearchAndSort searchQuery={searchQuery} sortBy={sortBy} onSearchChange={onSearchChange} onSortChange={onSortChange}/>
-          <TrackList tracks={trackList} searchQuery={searchQuery} sortBy={sortBy} selectedTracks={selectedTracks} downloadedTracks={downloadedTracks} failedTracks={failedTracks} skippedTracks={skippedTracks} downloadingTrack={downloadingTrack} isDownloading={isDownloading} currentPage={currentPage} itemsPerPage={itemsPerPage} showCheckboxes={true} hideAlbumColumn={false} folderName={artistInfo.name} isArtistDiscography={true} downloadedLyrics={downloadedLyrics} failedLyrics={failedLyrics} skippedLyrics={skippedLyrics} downloadingLyricsTrack={downloadingLyricsTrack} checkingAvailabilityTrack={checkingAvailabilityTrack} availabilityMap={availabilityMap} onToggleTrack={onToggleTrack} onToggleSelectAll={onToggleSelectAll} onSelectTrackRange={onSelectTrackRange} onDownloadTrack={onDownloadTrack} onDownloadLyrics={onDownloadLyrics} onDownloadCover={onDownloadCover} downloadedCovers={downloadedCovers} failedCovers={failedCovers} skippedCovers={skippedCovers} downloadingCoverTrack={downloadingCoverTrack} onCheckAvailability={onCheckAvailability} onPageChange={onPageChange} onAlbumClick={onAlbumClick} onArtistClick={onArtistClick} onTrackClick={onTrackClick}/>
+          <TrackList tracks={trackList} searchQuery={searchQuery} sortBy={sortBy} selectedTracks={selectedTracks} downloadedTracks={downloadedTracks} failedTracks={failedTracks} skippedTracks={skippedTracks} downloadingTrack={downloadingTrack} isDownloading={isDownloading} currentPage={currentPage} itemsPerPage={itemsPerPage} showCheckboxes={true} hideAlbumColumn={false} folderName={artistInfo.name} isArtistDiscography={true} downloadedLyrics={downloadedLyrics} failedLyrics={failedLyrics} skippedLyrics={skippedLyrics} downloadingLyricsTrack={downloadingLyricsTrack} checkingAvailabilityTrack={checkingAvailabilityTrack} availabilityMap={availabilityMap} onToggleTrack={onToggleTrack} onToggleSelectAll={onToggleSelectAll} onSelectTrackRange={onSelectTrackRange} onDownloadTrack={onDownloadTrack} onQueueTrack={onQueueTrack} onDownloadLyrics={onDownloadLyrics} onDownloadCover={onDownloadCover} downloadedCovers={downloadedCovers} failedCovers={failedCovers} skippedCovers={skippedCovers} downloadingCoverTrack={downloadingCoverTrack} onCheckAvailability={onCheckAvailability} onPageChange={onPageChange} onAlbumClick={onAlbumClick} onArtistClick={onArtistClick} onTrackClick={onTrackClick}/>
         </div>)}
     </div>);
 }

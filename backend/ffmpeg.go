@@ -3,10 +3,12 @@ package backend
 import (
 	"archive/tar"
 	"archive/zip"
+	"encoding/json"
 
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -374,37 +376,101 @@ func InstallFFmpegWithBrew(progressCallback func(int, string)) error {
 	return nil
 }
 
-const ffmpegReleaseBaseURL = "https://github.com/spotbye/Dependencies/releases/download/FFmpeg-8.1"
+const (
+	ffmpegReleasesAPIURL     = "https://api.github.com/repos/spotbye/Dependencies/releases"
+	ffmpegReleaseDownloadURL = "https://github.com/spotbye/Dependencies/releases/download"
+	ffmpegReleaseTagPrefix   = "FFmpeg-"
+)
 
-func buildFFmpegReleaseURL(assetName string) string {
-	return ffmpegReleaseBaseURL + "/" + assetName
+type githubRelease struct {
+	TagName    string `json:"tag_name"`
+	Draft      bool   `json:"draft"`
+	Prerelease bool   `json:"prerelease"`
+}
+
+func getLatestFFmpegReleaseTag() (string, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	for page := 1; ; page++ {
+		apiURL := fmt.Sprintf("%s?per_page=100&page=%d", ffmpegReleasesAPIURL, page)
+		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to create GitHub releases request: %w", err)
+		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("User-Agent", "SpotiFLAC")
+		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("failed to fetch GitHub releases: %w", err)
+		}
+
+		var releases []githubRelease
+		decodeErr := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&releases)
+		closeErr := resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("GitHub releases API returned %s", resp.Status)
+		}
+		if decodeErr != nil {
+			return "", fmt.Errorf("failed to decode GitHub releases: %w", decodeErr)
+		}
+		if closeErr != nil {
+			return "", fmt.Errorf("failed to close GitHub releases response: %w", closeErr)
+		}
+
+		for _, release := range releases {
+			if !release.Draft && !release.Prerelease && strings.HasPrefix(release.TagName, ffmpegReleaseTagPrefix) {
+				return release.TagName, nil
+			}
+		}
+
+		if len(releases) < 100 {
+			break
+		}
+	}
+
+	return "", fmt.Errorf("no stable GitHub release found with tag prefix %q", ffmpegReleaseTagPrefix)
+}
+
+func buildFFmpegReleaseURL(tagName, assetName string) string {
+	return ffmpegReleaseDownloadURL + "/" + url.PathEscape(tagName) + "/" + url.PathEscape(assetName)
 }
 
 func getFFmpegDownloadURLs() ([]string, []string, error) {
+	var ffmpegAssetName, ffprobeAssetName string
+
 	switch runtime.GOOS {
 	case "windows":
-		return []string{buildFFmpegReleaseURL("ffmpeg-windows.zip")}, []string{buildFFmpegReleaseURL("ffprobe-windows.zip")}, nil
+		ffmpegAssetName, ffprobeAssetName = "ffmpeg-windows.zip", "ffprobe-windows.zip"
 	case "linux":
 		switch runtime.GOARCH {
 		case "amd64":
-			return []string{buildFFmpegReleaseURL("ffmpeg-linux-amd64.zip")}, []string{buildFFmpegReleaseURL("ffprobe-linux-amd64.zip")}, nil
+			ffmpegAssetName, ffprobeAssetName = "ffmpeg-linux-amd64.zip", "ffprobe-linux-amd64.zip"
 		case "arm64":
-			return []string{buildFFmpegReleaseURL("ffmpeg-linux-arm64v8.zip")}, []string{buildFFmpegReleaseURL("ffprobe-linux-arm64v8.zip")}, nil
+			ffmpegAssetName, ffprobeAssetName = "ffmpeg-linux-arm64v8.zip", "ffprobe-linux-arm64v8.zip"
 		default:
 			return nil, nil, fmt.Errorf("unsupported Linux architecture: %s", runtime.GOARCH)
 		}
 	case "darwin":
 		switch runtime.GOARCH {
 		case "amd64":
-			return []string{buildFFmpegReleaseURL("ffmpeg-macos-amd64.zip")}, []string{buildFFmpegReleaseURL("ffprobe-macos-amd64.zip")}, nil
+			ffmpegAssetName, ffprobeAssetName = "ffmpeg-macos-amd64.zip", "ffprobe-macos-amd64.zip"
 		case "arm64":
-			return []string{buildFFmpegReleaseURL("ffmpeg-macos-arm64.zip")}, []string{buildFFmpegReleaseURL("ffprobe-macos-arm64.zip")}, nil
+			ffmpegAssetName, ffprobeAssetName = "ffmpeg-macos-arm64.zip", "ffprobe-macos-arm64.zip"
 		default:
 			return nil, nil, fmt.Errorf("unsupported macOS architecture: %s", runtime.GOARCH)
 		}
 	default:
 		return nil, nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
+
+	tagName, err := getLatestFFmpegReleaseTag()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return []string{buildFFmpegReleaseURL(tagName, ffmpegAssetName)}, []string{buildFFmpegReleaseURL(tagName, ffprobeAssetName)}, nil
 }
 
 func DownloadFFmpeg(progressCallback func(int)) error {

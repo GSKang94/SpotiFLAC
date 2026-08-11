@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, } from "@/components/ui/context-menu";
@@ -133,24 +134,24 @@ const InputWithContext = React.forwardRef<HTMLInputElement, InputWithContextProp
         <ContextMenuContent className="w-48">
           <ContextMenuItem onSelect={handleCut} disabled={!hasSelection || props.disabled || props.readOnly}>
             <Scissors className="mr-2 h-4 w-4"/>
-            Cut
-            <span className="ml-auto text-xs text-muted-foreground">Ctrl+X</span>
+            {t("translation.common.cut")}
+            <span className="ml-auto text-xs text-muted-foreground">{t("literal.common.ctrlX")}</span>
           </ContextMenuItem>
           <ContextMenuItem onSelect={handleCopy} disabled={!hasSelection || props.disabled}>
             <Copy className="mr-2 h-4 w-4"/>
-            Copy
-            <span className="ml-auto text-xs text-muted-foreground">Ctrl+C</span>
+            {t("translation.common.copy")}
+            <span className="ml-auto text-xs text-muted-foreground">{t("literal.common.ctrlC")}</span>
           </ContextMenuItem>
           <ContextMenuItem onSelect={handlePaste} disabled={!canPaste || props.disabled || props.readOnly}>
             <Clipboard className="mr-2 h-4 w-4"/>
-            Paste
-            <span className="ml-auto text-xs text-muted-foreground">Ctrl+V</span>
+            {t("translation.common.paste")}
+            <span className="ml-auto text-xs text-muted-foreground">{t("literal.common.ctrlV")}</span>
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={handleSelectAll} disabled={!inputRef.current?.value || props.disabled}>
             <Type className="mr-2 h-4 w-4"/>
-            Select All
-            <span className="ml-auto text-xs text-muted-foreground">Ctrl+A</span>
+            {t("translation.common.selectAll")}
+            <span className="ml-auto text-xs text-muted-foreground">{t("literal.common.ctrl")}</span>
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>);

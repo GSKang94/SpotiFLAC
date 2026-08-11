@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -426,39 +427,39 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
         key: ResultTab;
         label: string;
     }[] = [
-        { key: "tracks", label: "Tracks" },
-        { key: "albums", label: "Albums" },
-        { key: "artists", label: "Artists" },
-        { key: "playlists", label: "Playlists" },
+        { key: "tracks", label: t("translation.common.tracks") },
+        { key: "albums", label: t("translation.common.albums") },
+        { key: "artists", label: t("translation.common.artists") },
+        { key: "playlists", label: t("translation.common.playlists") },
     ];
     return (<div className="space-y-4">
       <div className="flex gap-2">
         <div className="relative flex-1">
           <InputWithContext id="spotify-smart-search" placeholder={placeholderText} value={url} onChange={(e) => handleSmartInputChange(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleFetchWithValidation()} className="pr-8"/>
-          {url && (<button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer" aria-label="Clear search input" onClick={() => {
+          {url && (<button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer" aria-label={t("translation.migrated.SearchBar.clearSearchInput")} onClick={() => {
                 handleSmartInputChange("");
             }}>
               <XCircle className="h-4 w-4"/>
             </button>)}
         </div>
 
-        <Button variant="outline" size="icon" className="shrink-0" aria-label="Paste from clipboard" onClick={() => void handleClipboardPaste()}>
+        <Button variant="outline" size="icon" className="shrink-0" aria-label={t("translation.searchBar.pasteClipboard")} onClick={() => void handleClipboardPaste()}>
           <Clipboard className="h-4 w-4"/>
         </Button>
 
         <Button onClick={handleFetchWithValidation} disabled={loading || (inputKind !== "spotify" && inputKind !== "next-url")}>
               {loading ? (<>
                   <Spinner />
-                  Fetching...
+                  {t("translation.searchBar.fetching")}
                 </>) : (<>
                   <CloudDownload className="h-4 w-4"/>
-                  Fetch
+                  {t("translation.searchBar.fetch")}
                 </>)}
         </Button>
       </div>
 
       {inputKind === "empty" && recentSearches.length > 0 && (<div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Recent Searches</p>
+          <p className="text-sm text-muted-foreground">{t("translation.searchBar.recentSearches")}</p>
           <div className="flex flex-wrap gap-2">
             {recentSearches.map((query) => (<div key={query} className="group relative flex items-center px-3 py-1.5 bg-muted hover:bg-accent rounded-full text-sm cursor-pointer transition-colors" onClick={() => handleSmartInputChange(query)}>
                 <span>{query}</span>
@@ -477,11 +478,11 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
       {isSearchInput && (<div className="space-y-4">
           {isSearching && (<div className="flex items-center justify-center py-8">
               <Spinner />
-              <span className="ml-2 text-muted-foreground">Searching...</span>
+              <span className="ml-2 text-muted-foreground">{t("translation.searchBar.searching")}</span>
             </div>)}
 
           {!isSearching && url && !hasAnyResults && (<div className="text-center py-8 text-muted-foreground">
-              No results found for "{url}"
+              {t("translation.migrated.SearchBar.noResultsFoundFor")}{url}"
             </div>)}
 
           {!isSearching && hasAnyResults && (<>
@@ -501,7 +502,7 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
               <div className="flex gap-2 mb-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
-                  <Input placeholder={`Search ${activeTab}...`} value={resultFilter} onChange={(e) => setResultFilter(e.target.value)} className="pl-10 pr-8"/>
+                  <Input placeholder={t("translation.migrated.SearchBar.search", { value1: activeTab })} value={resultFilter} onChange={(e) => setResultFilter(e.target.value)} className="pl-10 pr-8"/>
                   {resultFilter && (<button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer" onClick={() => setResultFilter("")}>
                       <XCircle className="h-4 w-4"/>
                     </button>)}
@@ -509,35 +510,35 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
                 <Select value={sortOrders[activeTab]} onValueChange={(val) => setSortOrders(prev => ({ ...prev, [activeTab]: val }))}>
                   <SelectTrigger className="w-42.5 bg-background gap-1.5">
                     <ArrowUpDown className="h-4 w-4 text-muted-foreground"/>
-                    <SelectValue placeholder="Sort by"/>
+                    <SelectValue placeholder={t("translation.common.sortBy")}/>
                   </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="default">Default</SelectItem>
+                      <SelectItem value="default">{t("translation.common.default")}</SelectItem>
                       {activeTab === 'tracks' && (<>
-                          <SelectItem value="title-asc">Title (A-Z)</SelectItem>
-                          <SelectItem value="title-desc">Title (Z-A)</SelectItem>
-                          <SelectItem value="artist-asc">Artist (A-Z)</SelectItem>
-                          <SelectItem value="artist-desc">Artist (Z-A)</SelectItem>
-                          <SelectItem value="duration-desc">Duration (Longest)</SelectItem>
-                          <SelectItem value="duration-asc">Duration (Shortest)</SelectItem>
+                          <SelectItem value="title-asc">{t("translation.common.titleZ")}</SelectItem>
+                          <SelectItem value="title-desc">{t("translation.common.titleZ2")}</SelectItem>
+                          <SelectItem value="artist-asc">{t("translation.common.artistZ")}</SelectItem>
+                          <SelectItem value="artist-desc">{t("translation.common.artistZ2")}</SelectItem>
+                          <SelectItem value="duration-desc">{t("translation.searchBar.durationLongest")}</SelectItem>
+                          <SelectItem value="duration-asc">{t("translation.searchBar.durationShortest")}</SelectItem>
                         </>)}
                       {activeTab === 'albums' && (<>
-                          <SelectItem value="title-asc">Title (A-Z)</SelectItem>
-                          <SelectItem value="title-desc">Title (Z-A)</SelectItem>
-                          <SelectItem value="artist-asc">Artist (A-Z)</SelectItem>
-                          <SelectItem value="artist-desc">Artist (Z-A)</SelectItem>
-                          <SelectItem value="year-desc">Year (Newest)</SelectItem>
-                          <SelectItem value="year-asc">Year (Oldest)</SelectItem>
+                          <SelectItem value="title-asc">{t("translation.common.titleZ")}</SelectItem>
+                          <SelectItem value="title-desc">{t("translation.common.titleZ2")}</SelectItem>
+                          <SelectItem value="artist-asc">{t("translation.common.artistZ")}</SelectItem>
+                          <SelectItem value="artist-desc">{t("translation.common.artistZ2")}</SelectItem>
+                          <SelectItem value="year-desc">{t("translation.searchBar.yearNewest")}</SelectItem>
+                          <SelectItem value="year-asc">{t("translation.searchBar.yearOldest")}</SelectItem>
                         </>)}
                       {activeTab === 'artists' && (<>
-                          <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-                          <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                          <SelectItem value="name-asc">{t("translation.searchBar.nameZ")}</SelectItem>
+                          <SelectItem value="name-desc">{t("translation.searchBar.nameZ2")}</SelectItem>
                         </>)}
                       {activeTab === 'playlists' && (<>
-                          <SelectItem value="title-asc">Title (A-Z)</SelectItem>
-                          <SelectItem value="title-desc">Title (Z-A)</SelectItem>
-                          <SelectItem value="owner-asc">Owner (A-Z)</SelectItem>
-                          <SelectItem value="owner-desc">Owner (Z-A)</SelectItem>
+                          <SelectItem value="title-asc">{t("translation.common.titleZ")}</SelectItem>
+                          <SelectItem value="title-desc">{t("translation.common.titleZ2")}</SelectItem>
+                          <SelectItem value="owner-asc">{t("translation.searchBar.ownerZ")}</SelectItem>
+                          <SelectItem value="owner-desc">{t("translation.searchBar.ownerZ2")}</SelectItem>
                         </>)}
                     </SelectContent>
                   </Select>
@@ -550,7 +551,7 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <p className="font-medium truncate">{track.name}</p>
-                          {track.is_explicit && (<span className="flex items-center justify-center min-w-4 h-4 rounded bg-red-600 text-[10px] font-bold text-white leading-none shrink-0" title="Explicit">
+                          {track.is_explicit && (<span className="flex items-center justify-center min-w-4 h-4 rounded bg-red-600 text-[10px] font-bold text-white leading-none shrink-0" title={t("translation.common.explicit")}>
                               E
                             </span>)}
                         </div>
@@ -582,7 +583,7 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
                       {artist.images ? (<img src={artist.images} alt="" className="w-12 h-12 rounded-full object-cover shrink-0"/>) : (<div className="w-12 h-12 rounded-full bg-muted shrink-0"/>)}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{artist.name}</p>
-                        <p className="text-sm text-muted-foreground">Artist</p>
+                        <p className="text-sm text-muted-foreground">{t("translation.common.artist")}</p>
                       </div>
                     </button>))}
 
@@ -602,10 +603,10 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
                   <Button variant="outline" onClick={handleLoadMore} disabled={isLoadingMore}>
                     {isLoadingMore ? (<>
                         <Spinner />
-                        Loading...
+                        {t("translation.common.loading")}
                       </>) : (<>
                         <ChevronDown className="h-4 w-4"/>
-                        Load More
+                        {t("translation.searchBar.loadMore")}
                       </>)}
                   </Button>
                 </div>)}
@@ -615,9 +616,9 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
       <Dialog open={showInvalidUrlDialog} onOpenChange={setShowInvalidUrlDialog}>
         <DialogContent className="sm:max-w-106.25">
           <DialogHeader>
-            <DialogTitle>Unsupported Link</DialogTitle>
+            <DialogTitle>{t("translation.migrated.SearchBar.unsupportedLink")}</DialogTitle>
             <DialogDescription>
-              Paste a Spotify link or enter plain text to search Spotify.
+              {t("translation.migrated.SearchBar.pasteASpotifyLinkOrEnterPlain")}
             </DialogDescription>
           </DialogHeader>
 
@@ -630,7 +631,7 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
             setShowInvalidUrlDialog(false);
             setInvalidUrl("");
         }}>
-              Close
+              {t("translation.common.close")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -639,9 +640,9 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
       <Dialog open={showNextDialog} onOpenChange={setShowNextDialog}>
         <DialogContent className="sm:max-w-115 [&>button]:hidden">
           <DialogHeader>
-            <DialogTitle>Open with SpotiFLAC Next</DialogTitle>
+            <DialogTitle>{t("translation.migrated.SearchBar.openWithSpotiFLACNext")}</DialogTitle>
             <DialogDescription>
-              {nextProvider || "This service"} links are supported in SpotiFLAC Next. This version only accepts Spotify links.
+              {nextProvider || t("translation.migrated.SearchBar.thisService")} {t("translation.migrated.SearchBar.linksAreSupportedInSpotiFLACNextThis")}
             </DialogDescription>
           </DialogHeader>
 
@@ -651,14 +652,14 @@ export function SearchBar({ url, loading, onUrlChange, onFetch, onFetchUrl, hist
 
           <DialogFooter className="gap-2 sm:justify-between">
             <Button variant="outline" onClick={() => setShowNextDialog(false)}>
-              Not Now
+              {t("translation.migrated.SearchBar.notNow")}
             </Button>
             <Button onClick={() => {
             openExternal(SPOTIFLAC_NEXT_URL);
             setShowNextDialog(false);
         }}>
               <ExternalLink className="h-4 w-4"/>
-              Get SpotiFLAC Next
+              {t("translation.migrated.SearchBar.getSpotiFLACNext")}
             </Button>
           </DialogFooter>
         </DialogContent>

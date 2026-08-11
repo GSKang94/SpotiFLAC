@@ -167,7 +167,7 @@ func LoadConfigSettings() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	return SanitizeSettingsMap(settings), nil
+	return SanitizeSettingsMap(FlattenConfigSettings(settings)), nil
 }
 
 func GetRedownloadWithSuffixSetting() bool {

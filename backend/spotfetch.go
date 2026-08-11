@@ -1261,7 +1261,7 @@ func FilterPlaylist(data map[string]interface{}, separator string) map[string]in
 	filtered := map[string]interface{}{
 		"id":          playlistID,
 		"name":        getString(playlistData, "name"),
-		"description": getString(playlistData, "description"),
+		"description": html.UnescapeString(getString(playlistData, "description")),
 		"owner":       ownerInfo,
 		"cover":       cover,
 		"count":       count,

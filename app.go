@@ -18,13 +18,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/afkarxyz/SpotiFLAC/backend"
+	"github.com/spotbye/SpotiFLAC/backend"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
-	ctx context.Context
+	ctx                          context.Context
+	replayGainAnalysisMu         sync.Mutex
+	replayGainAnalysisCancel     context.CancelFunc
+	replayGainAnalysisGeneration uint64
 }
 
 type CurrentIPInfo struct {
@@ -368,6 +371,9 @@ type DownloadRequest struct {
 	UseAlbumTrackNumber        bool   `json:"use_album_track_number,omitempty"`
 	SpotifyID                  string `json:"spotify_id,omitempty"`
 	EmbedLyrics                bool   `json:"embed_lyrics,omitempty"`
+	LyricsTranslationMode      string `json:"lyrics_translation_mode,omitempty"`
+	LyricsTranslationLang      string `json:"lyrics_translation_lang,omitempty"`
+	LRCLibTitleFallback        *bool  `json:"lrclib_title_fallback,omitempty"`
 	EmbedMaxQualityCover       bool   `json:"embed_max_quality_cover,omitempty"`
 	ServiceURL                 string `json:"service_url,omitempty"`
 	Duration                   int    `json:"duration,omitempty"`
@@ -448,6 +454,13 @@ func metadataTagSelectionFromSettings(settings map[string]interface{}) backend.M
 	selection.UPC = read("upc", selection.UPC)
 	selection.Comment = read("comment", selection.Comment)
 	return selection
+}
+
+func metadataDateFormatFromSettings(settings map[string]interface{}) string {
+	if value, ok := settings["metadataDateFormat"].(string); ok && value == "year" {
+		return "year"
+	}
+	return "full"
 }
 
 func parseAutoConvertTarget(target, requestedBitrate string) (outputFormat, codec, bitrate string, err error) {
@@ -792,7 +805,8 @@ func (a *App) DownloadTrack(req DownloadRequest) (DownloadResponse, error) {
 		if req.EmbedLyrics {
 			go func() {
 				client := backend.NewLyricsClient()
-				resp, _, err := client.FetchLyricsAllSources(req.SpotifyID, req.TrackName, req.ArtistName, req.AlbumName, req.Duration)
+				titleFallback := req.LRCLibTitleFallback == nil || *req.LRCLibTitleFallback
+				resp, _, err := client.FetchLyricsAllSources(req.SpotifyID, req.TrackName, req.ArtistName, req.AlbumName, req.Duration, titleFallback, req.LyricsTranslationMode, req.LyricsTranslationLang)
 				if err == nil && resp != nil && len(resp.Lines) > 0 {
 					lrc := client.ConvertToLRC(resp, req.TrackName, req.ArtistName)
 					lyricsChan <- lrc
@@ -993,8 +1007,13 @@ func (a *App) DownloadTrack(req DownloadRequest) (DownloadResponse, error) {
 		settings, settingsErr := a.LoadSettings()
 		if settingsErr != nil {
 			fmt.Printf("Warning: failed to load metadata tag settings: %v\n", settingsErr)
-		} else if filterErr := backend.ApplyMetadataTagSelection(filename, metadataTagSelectionFromSettings(settings)); filterErr != nil {
-			fmt.Printf("Warning: failed to apply metadata tag settings: %v\n", filterErr)
+		} else {
+			if dateErr := backend.ApplyMetadataDateFormat(filename, metadataDateFormatFromSettings(settings)); dateErr != nil {
+				fmt.Printf("Warning: failed to apply metadata date format: %v\n", dateErr)
+			}
+			if filterErr := backend.ApplyMetadataTagSelection(filename, metadataTagSelectionFromSettings(settings)); filterErr != nil {
+				fmt.Printf("Warning: failed to apply metadata tag settings: %v\n", filterErr)
+			}
 		}
 	}
 
@@ -1113,6 +1132,60 @@ func (a *App) OpenConfigFolder() error {
 		return fmt.Errorf("failed to create config directory: %v", err)
 	}
 	return backend.OpenFolderInExplorer(configDir)
+}
+
+func (a *App) BackupSettings() (string, error) {
+	settings, err := a.LoadSettings()
+	if err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		DefaultFilename: fmt.Sprintf("SpotiFLAC_Settings_%s.json", time.Now().Format("20060102_150405")),
+		Title:           "Backup Settings",
+		Filters:         []runtime.FileFilter{{DisplayName: "JSON Files (*.json)", Pattern: "*.json"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to open backup dialog: %w", err)
+	}
+	if strings.TrimSpace(path) == "" {
+		return "", nil
+	}
+	data, err := backend.MarshalConfigSettings(settings)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode settings backup: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return "", fmt.Errorf("failed to write settings backup: %w", err)
+	}
+	return path, nil
+}
+
+func (a *App) RestoreSettings() (string, error) {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Restore Settings",
+		Filters: []runtime.FileFilter{{DisplayName: "JSON Files (*.json)", Pattern: "*.json"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to open restore dialog: %w", err)
+	}
+	if strings.TrimSpace(path) == "" {
+		return "", nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read settings backup: %w", err)
+	}
+	var restored map[string]interface{}
+	if err := json.Unmarshal(data, &restored); err != nil {
+		return "", fmt.Errorf("invalid settings backup: %w", err)
+	}
+	if !backend.HasKnownConfigSettings(restored) {
+		return "", fmt.Errorf("the selected file does not contain valid SpotiFLAC settings")
+	}
+	if err := a.SaveSettings(backend.FlattenConfigSettings(restored)); err != nil {
+		return "", fmt.Errorf("failed to restore settings: %w", err)
+	}
+	return path, nil
 }
 
 func (a *App) SelectFolder(defaultPath string) (string, error) {
@@ -1814,19 +1887,22 @@ func (a *App) SaveSpectrumImage(audioFilePath string, base64Data string) (string
 }
 
 type LyricsDownloadRequest struct {
-	SpotifyID           string `json:"spotify_id"`
-	TrackName           string `json:"track_name"`
-	ArtistName          string `json:"artist_name"`
-	AlbumName           string `json:"album_name"`
-	AlbumArtist         string `json:"album_artist"`
-	ReleaseDate         string `json:"release_date"`
-	ISRC                string `json:"isrc,omitempty"`
-	OutputDir           string `json:"output_dir"`
-	FilenameFormat      string `json:"filename_format"`
-	TrackNumber         bool   `json:"track_number"`
-	Position            int    `json:"position"`
-	UseAlbumTrackNumber bool   `json:"use_album_track_number"`
-	DiscNumber          int    `json:"disc_number"`
+	SpotifyID             string `json:"spotify_id"`
+	TrackName             string `json:"track_name"`
+	ArtistName            string `json:"artist_name"`
+	AlbumName             string `json:"album_name"`
+	AlbumArtist           string `json:"album_artist"`
+	ReleaseDate           string `json:"release_date"`
+	ISRC                  string `json:"isrc,omitempty"`
+	OutputDir             string `json:"output_dir"`
+	FilenameFormat        string `json:"filename_format"`
+	TrackNumber           bool   `json:"track_number"`
+	Position              int    `json:"position"`
+	UseAlbumTrackNumber   bool   `json:"use_album_track_number"`
+	DiscNumber            int    `json:"disc_number"`
+	LyricsTranslationMode string `json:"lyrics_translation_mode,omitempty"`
+	LyricsTranslationLang string `json:"lyrics_translation_lang,omitempty"`
+	LRCLibTitleFallback   *bool  `json:"lrclib_title_fallback,omitempty"`
 }
 
 func (a *App) DownloadLyrics(req LyricsDownloadRequest) (backend.LyricsDownloadResponse, error) {
@@ -1839,19 +1915,22 @@ func (a *App) DownloadLyrics(req LyricsDownloadRequest) (backend.LyricsDownloadR
 
 	client := backend.NewLyricsClient()
 	backendReq := backend.LyricsDownloadRequest{
-		SpotifyID:           req.SpotifyID,
-		TrackName:           req.TrackName,
-		ArtistName:          req.ArtistName,
-		AlbumName:           req.AlbumName,
-		AlbumArtist:         req.AlbumArtist,
-		ReleaseDate:         req.ReleaseDate,
-		ISRC:                req.ISRC,
-		OutputDir:           req.OutputDir,
-		FilenameFormat:      req.FilenameFormat,
-		TrackNumber:         req.TrackNumber,
-		Position:            req.Position,
-		UseAlbumTrackNumber: req.UseAlbumTrackNumber,
-		DiscNumber:          req.DiscNumber,
+		SpotifyID:             req.SpotifyID,
+		TrackName:             req.TrackName,
+		ArtistName:            req.ArtistName,
+		AlbumName:             req.AlbumName,
+		AlbumArtist:           req.AlbumArtist,
+		ReleaseDate:           req.ReleaseDate,
+		ISRC:                  req.ISRC,
+		OutputDir:             req.OutputDir,
+		FilenameFormat:        req.FilenameFormat,
+		TrackNumber:           req.TrackNumber,
+		Position:              req.Position,
+		UseAlbumTrackNumber:   req.UseAlbumTrackNumber,
+		DiscNumber:            req.DiscNumber,
+		LyricsTranslationMode: req.LyricsTranslationMode,
+		LyricsTranslationLang: req.LyricsTranslationLang,
+		LRCLibTitleFallback:   req.LRCLibTitleFallback,
 	}
 
 	resp, err := client.DownloadLyrics(backendReq)
@@ -2164,12 +2243,112 @@ func (a *App) SelectAudioFiles() ([]string, error) {
 	return files, nil
 }
 
+func (a *App) EnrichAudioFiles(filePaths []string, priority string, allowFallback bool) []backend.EnrichResult {
+	if priority != "isrc" {
+		priority = "url"
+	}
+	settings, _ := a.LoadSettings()
+	separator := ", "
+	if value, ok := settings["spotifyWebMetadataSeparator"].(string); ok && strings.TrimSpace(value) != "" {
+		separator = strings.TrimSpace(value) + " "
+	}
+	results := make([]backend.EnrichResult, 0, len(filePaths))
+	for _, filePath := range filePaths {
+		if strings.TrimSpace(filePath) == "" {
+			continue
+		}
+		result := backend.EnrichFile(filePath, priority, allowFallback, separator)
+		if result.Status == "enriched" {
+			if err := backend.ApplyMetadataDateFormat(filePath, metadataDateFormatFromSettings(settings)); err != nil {
+				result.Status = "failed"
+				result.Message = err.Error()
+			}
+		}
+		results = append(results, result)
+	}
+	return results
+}
+
+func (a *App) InspectEnrichFile(filePath string) (backend.EnrichMetadataPreview, error) {
+	return backend.InspectEnrichFile(filePath)
+}
+
+func (a *App) InspectEnrichFiles(filePaths []string) []backend.EnrichMetadataPreview {
+	return backend.InspectEnrichFiles(filePaths)
+}
+
 func (a *App) GetFlacInfoBatch(paths []string) []backend.FlacInfo {
 	return backend.GetFlacInfoBatch(paths)
 }
 
 func (a *App) GetFileSizes(files []string) map[string]int64 {
 	return backend.GetFileSizes(files)
+}
+
+func (a *App) AnalyzeReplayGainFile(filePath string) backend.ReplayGainAnalysisResult {
+	a.replayGainAnalysisMu.Lock()
+	if a.replayGainAnalysisCancel != nil {
+		a.replayGainAnalysisCancel()
+	}
+	a.replayGainAnalysisGeneration++
+	generation := a.replayGainAnalysisGeneration
+	parent := a.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
+	a.replayGainAnalysisCancel = cancel
+	a.replayGainAnalysisMu.Unlock()
+
+	result := backend.AnalyzeReplayGainFileContext(ctx, filePath)
+	cancel()
+
+	a.replayGainAnalysisMu.Lock()
+	if a.replayGainAnalysisGeneration == generation {
+		a.replayGainAnalysisCancel = nil
+	}
+	a.replayGainAnalysisMu.Unlock()
+	return result
+}
+
+func (a *App) AnalyzeReplayGainAlbum(filePaths []string) backend.ReplayGainAnalysisResult {
+	a.replayGainAnalysisMu.Lock()
+	if a.replayGainAnalysisCancel != nil {
+		a.replayGainAnalysisCancel()
+	}
+	a.replayGainAnalysisGeneration++
+	generation := a.replayGainAnalysisGeneration
+	parent := a.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
+	a.replayGainAnalysisCancel = cancel
+	a.replayGainAnalysisMu.Unlock()
+
+	result := backend.AnalyzeReplayGainAlbumContext(ctx, filePaths)
+	cancel()
+
+	a.replayGainAnalysisMu.Lock()
+	if a.replayGainAnalysisGeneration == generation {
+		a.replayGainAnalysisCancel = nil
+	}
+	a.replayGainAnalysisMu.Unlock()
+	return result
+}
+
+func (a *App) CancelReplayGainAnalysis() {
+	a.replayGainAnalysisMu.Lock()
+	defer a.replayGainAnalysisMu.Unlock()
+	a.replayGainAnalysisGeneration++
+	if a.replayGainAnalysisCancel != nil {
+		a.replayGainAnalysisCancel()
+		a.replayGainAnalysisCancel = nil
+	}
+}
+
+func (a *App) WriteReplayGainTags(entries []backend.ReplayGainTagWrite) []backend.ReplayGainWriteResult {
+	return backend.WriteReplayGainTags(entries)
 }
 
 func (a *App) ListDirectoryFiles(dirPath string) ([]backend.FileInfo, error) {
@@ -2264,6 +2443,14 @@ func (a *App) DecodeAudioForAnalysis(filePath string) (*backend.AnalysisDecodeRe
 	}
 
 	return backend.DecodeAudioForAnalysis(filePath)
+}
+
+func (a *App) DecodeAudioForTempoKey(filePath string) (*backend.TempoKeyDecodeResponse, error) {
+	if filePath == "" {
+		return nil, fmt.Errorf("file path is required")
+	}
+
+	return backend.DecodeAudioForTempoKey(filePath)
 }
 
 func (a *App) RenameFileTo(oldPath, newName string) error {
@@ -2613,7 +2800,7 @@ func (a *App) SaveSettings(settings map[string]interface{}) error {
 		}
 	}
 
-	data, err := json.MarshalIndent(settings, "", "  ")
+	data, err := backend.MarshalConfigSettings(settings)
 	if err != nil {
 		return err
 	}
@@ -2662,7 +2849,13 @@ func (a *App) LoadSettings() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	return backend.SanitizeSettingsMap(settings), nil
+	settings = backend.SanitizeSettingsMap(backend.FlattenConfigSettings(settings))
+
+	if err := a.SaveSettings(settings); err != nil {
+		return nil, err
+	}
+
+	return settings, nil
 }
 
 func (a *App) LoadFonts() ([]map[string]interface{}, error) {

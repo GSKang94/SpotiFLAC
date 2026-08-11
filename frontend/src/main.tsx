@@ -4,6 +4,7 @@ import { MotionConfig } from "motion/react";
 import "./index.css";
 import App from "./App.tsx";
 import { Toaster } from "@/components/ui/sonner";
+import "@/i18n";
 createRoot(document.getElementById("root")!).render(<StrictMode>
     <MotionConfig reducedMotion="user">
       <App />

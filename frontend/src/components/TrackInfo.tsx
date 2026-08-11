@@ -1,10 +1,12 @@
+import { t } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Download, FolderOpen, CheckCircle, XCircle, FileText, FileCheck, Globe, ImageDown, Play, Pause } from "lucide-react";
+import { Download, FolderOpen, CheckCircle, XCircle, FileText, FileCheck, Globe, ImageDown, Play, Pause, ListPlus, Check } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger, } from "@/components/ui/tooltip";
 import type { TrackMetadata, TrackAvailability } from "@/types/api";
 import { usePreview } from "@/hooks/usePreview";
+import { useQueueFeedback } from "@/hooks/useQueueFeedback";
 import { AvailabilityLinks, hasAvailabilityLinks } from "./AvailabilityLinks";
 import { buildClickableArtists, getClickableArtistKey } from "@/lib/artist-links";
 interface TrackInfoProps {
@@ -28,6 +30,7 @@ interface TrackInfoProps {
     failedCover?: boolean;
     skippedCover?: boolean;
     onDownload: (id: string, name: string, artists: string, albumName?: string, spotifyId?: string, playlistName?: string, durationMs?: number, position?: number, albumArtist?: string, releaseDate?: string, coverUrl?: string, spotifyTrackNumber?: number, spotifyDiscNumber?: number, spotifyTotalTracks?: number, spotifyTotalDiscs?: number, copyright?: string, publisher?: string) => void;
+    onQueueTrack?: (track: TrackMetadata) => void;
     onDownloadLyrics?: (spotifyId: string, name: string, artists: string, albumName?: string, albumArtist?: string, releaseDate?: string, discNumber?: number) => void;
     onCheckAvailability?: (spotifyId: string) => void;
     onDownloadCover?: (coverUrl: string, trackName: string, artistName: string, albumName?: string, playlistName?: string, position?: number, trackId?: string, albumArtist?: string, releaseDate?: string, discNumber?: number) => void;
@@ -45,8 +48,9 @@ interface TrackInfoProps {
     onPublisherClick?: (publisher: string) => void;
     onBack?: () => void;
 }
-export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded, isFailed, isSkipped, downloadingLyricsTrack, downloadedLyrics, failedLyrics, skippedLyrics, checkingAvailability, availability, downloadingCover, downloadedCover, failedCover, skippedCover, onDownload, onDownloadLyrics, onCheckAvailability, onDownloadCover, onOpenFolder, onAlbumClick, onArtistClick, onPublisherClick, onBack, }: TrackInfoProps) {
+export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded, isFailed, isSkipped, downloadingLyricsTrack, downloadedLyrics, failedLyrics, skippedLyrics, checkingAvailability, availability, downloadingCover, downloadedCover, failedCover, skippedCover, onDownload, onQueueTrack, onDownloadLyrics, onCheckAvailability, onDownloadCover, onOpenFolder, onAlbumClick, onArtistClick, onPublisherClick, onBack, }: TrackInfoProps) {
     const { playPreview, loadingPreview, playingTrack } = usePreview();
+    const { flashQueued, isQueued } = useQueueFeedback();
     const hasAlbumClick = !!(onAlbumClick && track.album_id && track.album_url);
     const clickableArtists = buildClickableArtists(track.artists, track.artists_data, track.artist_id, track.artist_url);
     const formatDuration = (ms: number) => {
@@ -80,7 +84,7 @@ export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded
           <div className="space-y-1">
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold wrap-break-word">{track.name}</h1>
-              {track.is_explicit && (<span className="inline-flex items-center justify-center bg-red-600 text-white text-[10px] h-4 w-4 rounded shrink-0" title="Explicit">E</span>)}
+              {track.is_explicit && (<span className="inline-flex items-center justify-center bg-red-600 text-white text-[10px] h-4 w-4 rounded shrink-0" title={t("translation.common.explicit")}>E</span>)}
               {isSkipped ? (<FileCheck className="h-6 w-6 text-yellow-500 shrink-0"/>) : isDownloaded ? (<CheckCircle className="h-6 w-6 text-green-500 shrink-0"/>) : isFailed ? (<XCircle className="h-6 w-6 text-red-500 shrink-0"/>) : null}
             </div>
             <p className="text-lg text-muted-foreground">
@@ -99,7 +103,7 @@ export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="space-y-1">
               <div>
-                <p className="text-xs text-muted-foreground">Album</p>
+                <p className="text-xs text-muted-foreground">{t("translation.common.album")}</p>
                 <p className="min-w-0 truncate font-medium">{hasAlbumClick ? (<button type="button" className="block max-w-full cursor-pointer truncate rounded-sm bg-transparent p-0 text-left text-inherit hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60" title={track.album_name} onClick={() => onAlbumClick?.({
                 id: track.album_id!,
                 name: track.album_name,
@@ -109,24 +113,24 @@ export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded
                   </button>) : (track.album_name)}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Release Date</p>
+                <p className="text-xs text-muted-foreground">{t("translation.trackInfo.releaseDate")}</p>
                 <p className="font-medium">{track.release_date}</p>
               </div>
               {track.plays && (<div>
-                <p className="text-xs text-muted-foreground">Total Plays</p>
+                <p className="text-xs text-muted-foreground">{t("translation.trackInfo.totalPlays")}</p>
                 <p className="font-medium">{formatPlays(track.plays)}</p>
               </div>)}
             </div>
             <div className="space-y-1">
               {track.copyright && (<div>
-                <p className="text-xs text-muted-foreground">Copyright</p>
+                <p className="text-xs text-muted-foreground">{t("translation.common.copyright")}</p>
                 <p className="font-medium truncate" title={track.copyright}>
                   {track.copyright}
                 </p>
               </div>)}
               {track.publisher && (<div>
-                <p className="text-xs text-muted-foreground">Record Label</p>
-                <button type="button" className="max-w-full cursor-pointer truncate rounded-sm bg-transparent p-0 text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60" title={`Search Spotify for label: ${track.publisher}`} onClick={() => onPublisherClick?.(track.publisher!)}>
+                <p className="text-xs text-muted-foreground">{t("translation.trackInfo.recordLabel")}</p>
+                <button type="button" className="max-w-full cursor-pointer truncate rounded-sm bg-transparent p-0 text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60" title={t("translation.migrated.TrackInfo.searchSpotifyForLabel", { value1: track.publisher })} onClick={() => onPublisherClick?.(track.publisher!)}>
                   {track.publisher}
                 </button>
               </div>)}
@@ -136,9 +140,13 @@ export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded
             <Button onClick={() => onDownload(track.spotify_id || "", track.name, track.artists, track.album_name, track.spotify_id, undefined, track.duration_ms, track.track_number, track.album_artist, track.release_date, track.images, track.track_number, track.disc_number, track.total_tracks, track.total_discs, track.copyright, track.publisher)} disabled={isDownloading || downloadingTrack === track.spotify_id}>
               {downloadingTrack === track.spotify_id ? (<Spinner />) : (<>
                 <Download className="h-4 w-4"/>
-                Download
+                {t("translation.trackInfo.download")}
               </>)}
             </Button>
+            {onQueueTrack && (<Button onClick={() => { onQueueTrack(track); flashQueued(); }} variant="outline">
+              {isQueued() ? (<Check className="h-4 w-4 text-green-500"/>) : (<ListPlus className="h-4 w-4"/>)}
+              {t("translation.queue.addToQueue")}
+            </Button>)}
             {track.spotify_id && (<Tooltip>
               <TooltipTrigger asChild>
                 <Button onClick={() => playPreview(track.spotify_id!, track.name)} variant="outline" size="icon" disabled={loadingPreview === track.spotify_id}>
@@ -146,7 +154,7 @@ export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>{playingTrack === track.spotify_id ? "Stop Preview" : "Play Preview"}</p>
+                <p>{playingTrack === track.spotify_id ? t("translation.migrated.TrackInfo.stopPreview") : t("translation.migrated.TrackInfo.playPreview")}</p>
               </TooltipContent>
             </Tooltip>)}
             {track.spotify_id && onDownloadLyrics && (<Tooltip>
@@ -156,7 +164,7 @@ export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Download Separate Lyric</p>
+                <p>{t("translation.common.downloadSeparateLyric")}</p>
               </TooltipContent>
             </Tooltip>)}
             {track.images && onDownloadCover && (<Tooltip>
@@ -166,7 +174,7 @@ export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Download Separate Cover</p>
+                <p>{t("translation.common.downloadSeparateCover")}</p>
               </TooltipContent>
             </Tooltip>)}
             {track.spotify_id && onCheckAvailability && (<Tooltip>
@@ -186,7 +194,7 @@ export function TrackInfo({ track, isDownloading, downloadingTrack, isDownloaded
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Open Folder</p>
+                <p>{t("translation.common.openFolder")}</p>
               </TooltipContent>
             </Tooltip>)}
           </div>)}

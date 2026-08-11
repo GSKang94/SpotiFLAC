@@ -139,6 +139,9 @@ export interface DownloadRequest {
     use_album_track_number?: boolean;
     spotify_id?: string;
     embed_lyrics?: boolean;
+    lyrics_translation_mode?: "off" | "copilot" | "gemini";
+    lyrics_translation_lang?: string;
+    lrclib_title_fallback?: boolean;
     embed_max_quality_cover?: boolean;
     service_url?: string;
     duration?: number;
@@ -236,6 +239,9 @@ export interface LyricsDownloadRequest {
     disc_number?: number;
     total_tracks?: number;
     total_discs?: number;
+    lyrics_translation_mode?: "off" | "copilot" | "gemini";
+    lyrics_translation_lang?: string;
+    lrclib_title_fallback?: boolean;
 }
 export interface LyricsDownloadResponse {
     success: boolean;

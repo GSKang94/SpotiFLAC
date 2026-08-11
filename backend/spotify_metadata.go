@@ -407,7 +407,8 @@ func (c *SpotifyMetadataClient) getRawSpotifyData(ctx context.Context, parsed sp
 func (c *SpotifyMetadataClient) processSpotifyData(ctx context.Context, raw interface{}, callback MetadataCallback) (interface{}, error) {
 	switch payload := raw.(type) {
 	case *apiPlaylistResponse:
-		return c.formatPlaylistData(payload, callback), nil
+
+		return c.formatPlaylistData(payload, nil), nil
 	case *apiAlbumResponse:
 		return c.formatAlbumData(payload, callback)
 	case *apiTrackResponse:
@@ -775,6 +776,7 @@ func (c *SpotifyMetadataClient) fetchPlaylist(ctx context.Context, playlistID st
 				var result apiPlaylistResponse
 				if json.Unmarshal(jsonData, &result) == nil {
 					formatted := c.formatPlaylistData(&result, nil)
+					formatted.TrackList = []AlbumTrackMetadata{}
 					callback(formatted)
 				}
 			}
@@ -789,6 +791,19 @@ func (c *SpotifyMetadataClient) fetchPlaylist(ctx context.Context, playlistID st
 		}
 
 		allItems = append(allItems, items...)
+
+		if callback != nil {
+
+			filtered := FilterPlaylist(response, c.Separator)
+			jsonData, _ := json.Marshal(filtered)
+			var pageResult apiPlaylistResponse
+			if err := json.Unmarshal(jsonData, &pageResult); err == nil {
+				formattedPage := c.formatPlaylistData(&pageResult, nil)
+				if len(formattedPage.TrackList) > 0 {
+					callback(formattedPage.TrackList)
+				}
+			}
+		}
 
 		if totalCount == nil {
 			if tc, ok := content["totalCount"].(float64); ok {

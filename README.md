@@ -13,13 +13,12 @@
       href="https://github.com/spotbye/SpotiFLAC/releases"><img
         src="https://img.shields.io/github/downloads/spotbye/SpotiFLAC/total?color=22c55e&labelColor=black&logo=github&label=Downloads" /></a><a
       href="https://github.com/spotbye/SpotiFLAC/releases/latest"><img
-        src="https://img.shields.io/github/v/release/spotbye/SpotiFLAC?color=8b5cf6&labelColor=black&logo=github&label=Latest%20Release" /></a><a
+        src="https://img.shields.io/github/v/release/spotbye/SpotiFLAC?color=8b5cf6&labelColor=black&logo=github&label=Latest%20Release" /></a><a href="https://github.com/spotbye/SpotiFLAC/releases/latest"><img
+        src="https://img.shields.io/badge/Windows-369eff?labelColor=black&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgMjAgMjAiPjxwYXRoIGZpbGw9IiNmZmZmZmYiIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTIwIDEwLjg3M1YyMEw4LjQ3OSAxOC41MzdsLjAwMS03LjY2NEgyMFptLTEzLjEyIDBsLS4wMDEgNy40NjFMMCAxNy40NjF2LTYuNTg4aDYuODhaTTIwIDkuMjczSDguNDhsLS4wMDEtNy44MUwyMCAwdjkuMjczWk02Ljg3OSAxLjY2NmwuMDAxIDcuNjA3SDBWMi41MzlsNi44NzktLjg3M1oiLz48L3N2Zz4=" /></a><a
       href="https://github.com/spotbye/SpotiFLAC/releases/latest"><img
-        src="https://img.shields.io/badge/Windows-10%2B-369eff?labelColor=black&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgMjAgMjAiPjxwYXRoIGZpbGw9IiNmZmZmZmYiIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTIwIDEwLjg3M1YyMEw4LjQ3OSAxOC41MzdsLjAwMS03LjY2NEgyMFptLTEzLjEyIDBsLS4wMDEgNy40NjFMMCAxNy40NjF2LTYuNTg4aDYuODhaTTIwIDkuMjczSDguNDhsLS4wMDEtNy44MUwyMCAwdjkuMjczWk02Ljg3OSAxLjY2NmwuMDAxIDcuNjA3SDBWMi41MzlsNi44NzktLjg3M1oiLz48L3N2Zz4=" /></a><a
+        src="https://img.shields.io/badge/macOS-FFFFFF?labelColor=black&logo=apple&logoColor=white" /></a><a
       href="https://github.com/spotbye/SpotiFLAC/releases/latest"><img
-        src="https://img.shields.io/badge/macOS-10.13%2B-FFFFFF?labelColor=black&logo=apple&logoColor=white" /></a><a
-      href="https://github.com/spotbye/SpotiFLAC/releases/latest"><img
-        src="https://img.shields.io/badge/Linux-Any-FCC624?labelColor=black&logo=linux&logoColor=white" /></a><a
+        src="https://img.shields.io/badge/Linux-FCC624?labelColor=black&logo=linux&logoColor=white" /></a><a
       href="https://t.me/spotiflac"><img
         src="https://img.shields.io/badge/Announcements-369eff?labelColor=black&logo=telegram&logoColor=white" /></a>
     <br />
@@ -55,9 +54,9 @@ Download Spotify Tracks, Albums, Playlists & Discography as MP3/OGG/Opus.
 
 SpotiFLAC for Android & iOS — maintained by [@zarzet](https://github.com/zarzet)
 
-### [SpotiFLAC (Python Module)](https://github.com/ShuShuzinhuu/SpotiFLAC-Module-Version)
+### [SpotiFLAC (Python Module)](https://github.com/BartolomeoRusso9/SpotiFLAC-Module-Version)
 
-SpotiFLAC Python library for SpotiFLAC integration — maintained by [@ShuShuzinhuu](https://github.com/ShuShuzinhuu)
+SpotiFLAC Python library for SpotiFLAC integration — maintained by [@BartolomeoRusso9](https://github.com/BartolomeoRusso9)
 
 ## FAQ
 
@@ -112,8 +111,6 @@ consider supporting the project by buying me a coffee.
 Your support helps keep development going._
 
 </details>
-
-[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/afkarxyz)
 
 ## Disclaimer
 

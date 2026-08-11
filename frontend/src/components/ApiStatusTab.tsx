@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlugZap, CheckCircle2, Loader2, Wrench, Server, Clock3 } from "lucide-react";
@@ -16,16 +17,16 @@ type CommunityBreakStatuses = Record<string, CommunityBreakStatus>;
 const GetCommunityBreakStatuses = (): Promise<CommunityBreakStatuses> => (window as any)["go"]["main"]["App"]["GetCommunityBreakStatuses"]();
 function renderBreakInfo(status: CommunityBreakStatus | undefined, loading: boolean) {
     if (loading && !status) {
-        return <span className="text-xs text-muted-foreground">Loading schedule...</span>;
+        return <span className="text-xs text-muted-foreground">{t("translation.migrated.ApiStatusTab.loadingSchedule")}</span>;
     }
     if (!status?.available) {
-        return <span className="text-xs text-muted-foreground">Break schedule unavailable</span>;
+        return <span className="text-xs text-muted-foreground">{t("translation.migrated.ApiStatusTab.breakScheduleUnavailable")}</span>;
     }
     if (!status.enabled) {
-        return <span className="text-xs text-muted-foreground">Scheduled break disabled</span>;
+        return <span className="text-xs text-muted-foreground">{t("translation.migrated.ApiStatusTab.scheduledBreakDisabled")}</span>;
     }
     return (<span className="text-xs text-muted-foreground">
-      {status.is_break ? `Break ends in ${status.remaining_minutes} min` : `Break starts in ${status.remaining_minutes} min`}
+      {status.is_break ? t("translation.migrated.ApiStatusTab.breakEndsInMin", { value1: status.remaining_minutes }) : t("translation.migrated.ApiStatusTab.breakStartsInMin", { value1: status.remaining_minutes })}
     </span>);
 }
 function renderStatusIndicator(status: "checking" | "online" | "offline" | "idle") {
@@ -83,11 +84,11 @@ export function ApiStatusTab() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => openExternal("https://spotbye.qzz.io")} className="gap-2">
               <Server className="h-4 w-4"/>
-              Details
+              {t("translation.common.details")}
             </Button>
             <Button variant="outline" size="sm" onClick={checkAll} disabled={isChecking || isCheckingBreaks} className="gap-2">
               {isChecking || isCheckingBreaks ? <Loader2 className="h-4 w-4 animate-spin"/> : <PlugZap className="h-4 w-4"/>}
-              Check
+              {t("translation.common.check")}
             </Button>
           </div>
         </div>
@@ -111,14 +112,14 @@ export function ApiStatusTab() {
         })}
         </div>
         <p className="text-xs text-muted-foreground">
-          *The servers are available for about 1 hour after each scheduled break.
+          {t("translation.migrated.ApiStatusTab.theServersAreAvailableForAbout1")}
         </p>
       </div>
 
       <div className="border-t"/>
 
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold tracking-tight">SpotiFLAC Next</h3>
+        <h3 className="text-sm font-semibold tracking-tight">{t("literal.header.spotiflacNext")}</h3>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {SPOTIFLAC_NEXT_SOURCES.map((source) => {

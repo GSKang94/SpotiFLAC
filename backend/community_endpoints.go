@@ -125,6 +125,8 @@ const communityRateLimitMaxRetries = 6
 
 const communityRateLimitFallbackWait = 30 * time.Second
 
+const communityCooldownNormalNotice = "This is normal and not a bug. "
+
 const communityCooldownFallbackMessage = "The server is taking a scheduled short break. Please try again in about %d minute(s)."
 
 type communityCooldownError struct {
@@ -211,6 +213,9 @@ func newCommunityCooldownError(service string, resp *http.Response) *communityCo
 	}
 	if message == "" {
 		message = fmt.Sprintf(communityCooldownFallbackMessage, max(1, (seconds+59)/60))
+	}
+	if !strings.HasPrefix(message, communityCooldownNormalNotice) {
+		message = communityCooldownNormalNotice + message
 	}
 
 	SetCommunityCooldown(float64(seconds), message)

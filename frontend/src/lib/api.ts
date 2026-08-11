@@ -27,6 +27,9 @@ export async function downloadTrack(request: DownloadRequest): Promise<DownloadR
         allow_fallback: settings.allowFallback,
         allow_atmos_fallback: settings.allowAtmosFallback,
         atmos_fallback_quality: settings.atmosFallbackQuality,
+        lyrics_translation_mode: settings.lyricsTranslationMode,
+        lyrics_translation_lang: settings.lyricsTranslationLang,
+        lrclib_title_fallback: settings.lrclibTitleFallback,
     };
     const req = new main.DownloadRequest(enriched);
     Object.assign(req, enriched);
@@ -46,7 +49,15 @@ export async function fetchCurrentIPInfo(): Promise<CurrentIPInfo> {
     return JSON.parse(jsonString);
 }
 export async function downloadLyrics(request: LyricsDownloadRequest): Promise<LyricsDownloadResponse> {
-    const req = new main.LyricsDownloadRequest(request);
+    const settings = getSettings();
+    const enriched = {
+        ...request,
+        lyrics_translation_mode: request.lyrics_translation_mode ?? settings.lyricsTranslationMode,
+        lyrics_translation_lang: request.lyrics_translation_lang ?? settings.lyricsTranslationLang,
+        lrclib_title_fallback: request.lrclib_title_fallback ?? settings.lrclibTitleFallback,
+    };
+    const req = new main.LyricsDownloadRequest(enriched);
+    Object.assign(req, enriched);
     return await DownloadLyrics(req);
 }
 export async function downloadCover(request: CoverDownloadRequest): Promise<CoverDownloadResponse> {

@@ -1,5 +1,6 @@
 import { GetDefaults, LoadFonts as LoadFontsFromBackend, LoadSettings, SaveFonts as SaveFontsToBackend, SaveSettings as SaveToBackend, } from "../../wailsjs/go/main/App";
 import { getFirstArtist } from "./utils";
+import { isAppLanguage, t, type AppLanguage } from "@/i18n";
 export type BuiltInFontFamily = "google-sans" | "inter" | "poppins" | "roboto" | "dm-sans" | "plus-jakarta-sans" | "manrope" | "space-grotesk" | "noto-sans" | "nunito-sans" | "figtree" | "raleway" | "public-sans" | "outfit" | "jetbrains-mono" | "geist-sans" | "bricolage-grotesque";
 export type CustomFontFamily = `custom-${string}`;
 export type FontFamily = BuiltInFontFamily | CustomFontFamily;
@@ -36,6 +37,7 @@ export interface MetadataTagToggles {
 }
 export interface Settings {
     downloadPath: string;
+    language: AppLanguage;
     downloader: "auto" | "tidal" | "qobuz" | "amazon";
     customTidalApi: string;
     customQobuzApi: string;
@@ -58,6 +60,9 @@ export interface Settings {
     trackNumber: boolean;
     sfxEnabled: boolean;
     embedLyrics: boolean;
+    lyricsTranslationMode: "off" | "copilot" | "gemini";
+    lyricsTranslationLang: string;
+    lrclibTitleFallback: boolean;
     embedMaxQualityCover: boolean;
     operatingSystem: "Windows" | "linux/MacOS";
     tidalQuality: "LOSSLESS" | "HI_RES_LOSSLESS" | "ATMOS";
@@ -74,6 +79,7 @@ export interface Settings {
     saveCover: boolean;
     exportLogsFile: boolean;
     exportLogsOnlyFailed: boolean;
+    showUpdateNotifications: boolean;
     previewVolume: number;
     existingFileCheckMode: ExistingFileCheckMode;
     autoConvertAudio: boolean;
@@ -89,6 +95,7 @@ export interface Settings {
     embedGenre: boolean;
     redownloadWithSuffix: boolean;
     separator: "comma" | "semicolon";
+    metadataDateFormat: "full" | "year";
     metadataTags: MetadataTagToggles;
 }
 export const FOLDER_PRESETS: Record<FolderPreset, {
@@ -96,8 +103,8 @@ export const FOLDER_PRESETS: Record<FolderPreset, {
     template: string;
 }> = {
     none: { label: "No Subfolder", template: "" },
-    artist: { label: "Artist", template: "{artist}" },
-    album: { label: "Album", template: "{album}" },
+    artist: { label: t("translation.common.artist"), template: "{artist}" },
+    album: { label: t("translation.common.album"), template: "{album}" },
     "year-album": { label: "[Year] Album", template: "[{year}] {album}" },
     "year-artist-album": {
         label: "[Year] Artist - Album",
@@ -112,7 +119,7 @@ export const FOLDER_PRESETS: Record<FolderPreset, {
         label: "Artist / Year / Album",
         template: "{artist}/{year}/{album}",
     },
-    "album-artist": { label: "Album Artist", template: "{album_artist}" },
+    "album-artist": { label: t("translation.common.albumArtist"), template: "{album_artist}" },
     "album-artist-album": {
         label: "Album Artist / Album",
         template: "{album_artist}/{album}",
@@ -125,7 +132,7 @@ export const FOLDER_PRESETS: Record<FolderPreset, {
         label: "Album Artist / Year / Album",
         template: "{album_artist}/{year}/{album}",
     },
-    year: { label: "Year", template: "{year}" },
+    year: { label: t("translation.fileManager.year"), template: "{year}" },
     "year-artist": { label: "Year / Artist", template: "{year}/{artist}" },
     custom: { label: "Custom...", template: "{artist}/{album}" },
 };
@@ -133,7 +140,7 @@ export const FILENAME_PRESETS: Record<FilenamePreset, {
     label: string;
     template: string;
 }> = {
-    title: { label: "Title", template: "{title}" },
+    title: { label: t("translation.common.title"), template: "{title}" },
     "title-artist": { label: "Title - Artist", template: "{title} - {artist}" },
     "artist-title": { label: "Artist - Title", template: "{artist} - {title}" },
     "track-title": { label: "Track. Title", template: "{track}. {title}" },
@@ -191,21 +198,21 @@ export const SAMPLE_TEMPLATE_DATA: TemplateData = {
     playlist: "My Playlist",
 };
 export const TEMPLATE_VARIABLES: TemplateToken[] = [
-    { key: "{title}", description: "Track title", example: "Golden" },
-    { key: "{artist}", description: "Primary artist", example: "HUNTR/X" },
-    { key: "{artists}", description: "All performers", example: "HUNTR/X / EJAE / AUDREY NUNA / REI AMI / KPop Demon Hunters Cast" },
-    { key: "{album}", description: "Album name", example: "KPop Demon Hunters (Soundtrack from the Netflix Film)" },
-    { key: "{album_artist}", description: "Album artist", example: "KPop Demon Hunters Cast / HUNTR/X / Saja Boys" },
-    { key: "{track}", description: "Track number", example: "04" },
-    { key: "{total_tracks}", description: "Total tracks in album", example: "12" },
-    { key: "{disc}", description: "Disc number", example: "1" },
-    { key: "{total_discs}", description: "Total discs in album", example: "1" },
-    { key: "{year}", description: "Release year", example: "2025" },
-    { key: "{date}", description: "Release date (YYYY-MM-DD)", example: "2025-06-20" },
-    { key: "{isrc}", description: "Track ISRC", example: "QZ8BZ2513510" },
-    { key: "{upc}", description: "Album UPC / barcode", example: "00602478398346" },
-    { key: "{category}", description: "Release category", example: "Albums" },
-    { key: "{playlist}", description: "Playlist name", example: "My Playlist" },
+    { key: "{title}", description: t("translation.common.trackTitle"), example: "Golden" },
+    { key: "{artist}", description: t("translation.settings.primaryArtist"), example: "HUNTR/X" },
+    { key: "{artists}", description: t("translation.settings.allPerformers"), example: "HUNTR/X / EJAE / AUDREY NUNA / REI AMI / KPop Demon Hunters Cast" },
+    { key: "{album}", description: t("translation.common.albumName"), example: "KPop Demon Hunters (Soundtrack from the Netflix Film)" },
+    { key: "{album_artist}", description: t("translation.common.albumArtist2"), example: "KPop Demon Hunters Cast / HUNTR/X / Saja Boys" },
+    { key: "{track}", description: t("translation.common.trackNumber"), example: "04" },
+    { key: "{total_tracks}", description: t("translation.settings.totalTracksAlbum"), example: "12" },
+    { key: "{disc}", description: t("translation.common.discNumber"), example: "1" },
+    { key: "{total_discs}", description: t("translation.settings.totalDiscsAlbum"), example: "1" },
+    { key: "{year}", description: t("translation.common.releaseYear"), example: "2025" },
+    { key: "{date}", description: t("translation.settings.releaseDateYyyyMmDd"), example: "2025-06-20" },
+    { key: "{isrc}", description: t("translation.common.trackIsrc"), example: "QZ8BZ2513510" },
+    { key: "{upc}", description: t("translation.common.albumUpcBarcode"), example: "00602478398346" },
+    { key: "{category}", description: t("translation.settings.releaseCategory"), example: "Albums" },
+    { key: "{playlist}", description: t("translation.settings.playlistName"), example: "My Playlist" },
 ];
 function detectOS(): "Windows" | "linux/MacOS" {
     const platform = window.navigator.platform.toLowerCase();
@@ -216,6 +223,7 @@ function detectOS(): "Windows" | "linux/MacOS" {
 }
 export const DEFAULT_SETTINGS: Settings = {
     downloadPath: "",
+    language: "en",
     downloader: "auto",
     customTidalApi: "",
     customQobuzApi: "",
@@ -235,6 +243,9 @@ export const DEFAULT_SETTINGS: Settings = {
     trackNumber: false,
     sfxEnabled: true,
     embedLyrics: false,
+    lyricsTranslationMode: "off",
+    lyricsTranslationLang: "en",
+    lrclibTitleFallback: true,
     embedMaxQualityCover: false,
     operatingSystem: detectOS(),
     tidalQuality: "LOSSLESS",
@@ -251,6 +262,7 @@ export const DEFAULT_SETTINGS: Settings = {
     saveCover: false,
     exportLogsFile: true,
     exportLogsOnlyFailed: false,
+    showUpdateNotifications: true,
     previewVolume: 100,
     existingFileCheckMode: "filename",
     autoConvertAudio: false,
@@ -266,6 +278,7 @@ export const DEFAULT_SETTINGS: Settings = {
     embedGenre: false,
     redownloadWithSuffix: true,
     separator: "semicolon",
+    metadataDateFormat: "full",
     metadataTags: {
         title: true,
         artist: true,
@@ -286,87 +299,87 @@ export const DEFAULT_SETTINGS: Settings = {
 export const FONT_OPTIONS: FontOption[] = [
     {
         value: "bricolage-grotesque",
-        label: "Bricolage Grotesque",
+        label: t("literal.settings.bricolageGrotesque"),
         fontFamily: '"Bricolage Grotesque", system-ui, sans-serif',
     },
     {
         value: "dm-sans",
-        label: "DM Sans",
+        label: t("literal.settings.dmSans"),
         fontFamily: '"DM Sans", system-ui, sans-serif',
     },
     {
         value: "figtree",
-        label: "Figtree",
+        label: t("literal.settings.figtree"),
         fontFamily: '"Figtree", system-ui, sans-serif',
     },
     {
         value: "geist-sans",
-        label: "Geist Sans",
+        label: t("literal.settings.geistSans"),
         fontFamily: '"Geist", system-ui, sans-serif',
     },
     {
         value: "google-sans",
-        label: "Google Sans",
+        label: t("literal.settings.googleSans"),
         fontFamily: '"Google Sans", system-ui, sans-serif',
     },
     {
         value: "inter",
-        label: "Inter",
+        label: t("literal.settings.inter"),
         fontFamily: '"Inter", system-ui, sans-serif',
     },
     {
         value: "jetbrains-mono",
-        label: "JetBrains Mono",
+        label: t("literal.settings.jetbrainsMono"),
         fontFamily: '"JetBrains Mono", ui-monospace, monospace',
     },
     {
         value: "manrope",
-        label: "Manrope",
+        label: t("literal.settings.manrope"),
         fontFamily: '"Manrope", system-ui, sans-serif',
     },
     {
         value: "noto-sans",
-        label: "Noto Sans",
+        label: t("literal.settings.notoSans"),
         fontFamily: '"Noto Sans", system-ui, sans-serif',
     },
     {
         value: "nunito-sans",
-        label: "Nunito Sans",
+        label: t("literal.settings.nunitoSans"),
         fontFamily: '"Nunito Sans", system-ui, sans-serif',
     },
     {
         value: "outfit",
-        label: "Outfit",
+        label: t("literal.settings.outfit"),
         fontFamily: '"Outfit", system-ui, sans-serif',
     },
     {
         value: "plus-jakarta-sans",
-        label: "Plus Jakarta Sans",
+        label: t("literal.settings.plusJakartaSans"),
         fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif',
     },
     {
         value: "poppins",
-        label: "Poppins",
+        label: t("literal.settings.poppins"),
         fontFamily: '"Poppins", system-ui, sans-serif',
     },
     {
         value: "public-sans",
-        label: "Public Sans",
+        label: t("literal.settings.publicSans"),
         fontFamily: '"Public Sans", system-ui, sans-serif',
     },
     {
         value: "raleway",
-        label: "Raleway",
+        label: t("literal.settings.raleway"),
         fontFamily: '"Raleway", system-ui, sans-serif',
     },
     {
         value: "roboto",
-        label: "Roboto",
+        label: t("literal.settings.roboto"),
         fontFamily: '"Roboto", system-ui, sans-serif',
     },
     {
         value: "space-grotesk",
-        label: "Space Grotesk",
+        label: t("literal.settings.spaceGrotesk"),
         fontFamily: '"Space Grotesk", system-ui, sans-serif',
     },
 ];
@@ -739,6 +752,7 @@ function normalizeSettingsPayload(settings: SettingsPayload): SettingsPayload {
     if (!("createM3u8File" in normalized)) {
         normalized.createM3u8File = false;
     }
+    normalized.showUpdateNotifications = typeof settings.showUpdateNotifications === "boolean" ? settings.showUpdateNotifications : true;
     normalized.previewVolume = normalizePreviewVolume(normalized.previewVolume);
     normalized.existingFileCheckMode = normalizeExistingFileCheckMode(normalized.existingFileCheckMode);
     if (!("useFirstArtistOnly" in normalized)) {
@@ -756,6 +770,7 @@ function normalizeSettingsPayload(settings: SettingsPayload): SettingsPayload {
     if (!("redownloadWithSuffix" in normalized)) {
         normalized.redownloadWithSuffix = false;
     }
+    normalized.metadataDateFormat = settings.metadataDateFormat === "year" ? "year" : "full";
     const metadataTags: MetadataTagToggles = { ...DEFAULT_SETTINGS.metadataTags };
     if (normalized.metadataTags && typeof normalized.metadataTags === "object") {
         const rawTags = normalized.metadataTags as Partial<MetadataTagToggles>;
@@ -773,10 +788,12 @@ function normalizeSettingsPayload(settings: SettingsPayload): SettingsPayload {
     return normalized;
 }
 function toNormalizedSettings(settings: SettingsPayload): Settings {
-    return {
+    const normalized = {
         ...DEFAULT_SETTINGS,
         ...keepKnownSettings(normalizeSettingsPayload(settings)),
     } as Settings;
+    normalized.language = isAppLanguage(normalized.language) ? normalized.language : DEFAULT_SETTINGS.language;
+    return normalized;
 }
 async function persistSettingsInternal(settings: Settings, notify = true): Promise<void> {
     cachedSettings = settings;

@@ -1,10 +1,50 @@
 import { useState, useRef } from "react";
+import { t, translateMessage } from "@/i18n";
 import { downloadTrack, fetchSpotifyMetadata } from "@/lib/api";
 import { getSettings, parseTemplate, sanitizeAutoOrder, getEffectiveAlbumFilenameTemplate, templateUsesAlbumTrackNumber, getAlbumCategoryLabel, type TemplateData } from "@/lib/settings";
 import { toastWithSound as toast } from "@/lib/toast-with-sound";
 import { joinPath, sanitizePath, getFirstArtist } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import type { TrackMetadata } from "@/types/api";
+import { beginDirectCollectionQueueItem, beginDirectTrackQueueItem, finishDirectQueueItem, type QueueExecutionResult, type QueueItemType, type QueueTrackStatus } from "@/lib/queue";
+type BatchDownloadSource = "playlist" | "album" | "discography" | "collection";
+function queueCollectionType(source: BatchDownloadSource, tracks: TrackMetadata[] = []): Exclude<QueueItemType, "track"> {
+    if (source === "album")
+        return "album";
+    if (source === "discography")
+        return "artist";
+    if (source === "collection") {
+        const artistIds = new Set(tracks.map((track) => track.artist_id).filter(Boolean));
+        const albumIds = new Set(tracks.map((track) => track.album_id || track.album_name).filter(Boolean));
+        if (artistIds.size === 1 && albumIds.size > 1)
+            return "artist";
+    }
+    return "playlist";
+}
+function buildQueueExecutionResult(tracks: TrackMetadata[], skipped: Set<string>, failed: Map<string, string>, completed: Set<string>, cancelled = false): QueueExecutionResult {
+    const trackResults: Record<string, QueueTrackStatus> = {};
+    let successCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+    for (const track of tracks) {
+        const id = track.spotify_id || "";
+        if (!id)
+            continue;
+        if (failed.has(id)) {
+            trackResults[id] = "failed";
+            failedCount++;
+        }
+        else if (skipped.has(id)) {
+            trackResults[id] = "skipped";
+            skippedCount++;
+        }
+        else if (completed.has(id)) {
+            trackResults[id] = "done";
+            successCount++;
+        }
+    }
+    return { trackResults, successCount, skippedCount, failedCount, cancelled };
+}
 function isCooldownMessage(message?: string): boolean {
     if (!message)
         return false;
@@ -226,7 +266,7 @@ export function useDownload() {
                     fileExists = true;
                     return {
                         success: true,
-                        message: "File already exists",
+                        message: t("translation.downloadQueue.fileAlreadyExists"),
                         file: existenceResults[0].file_path || "",
                         already_exists: true,
                     };
@@ -255,7 +295,7 @@ export function useDownload() {
                 }
             }
             const durationSeconds = durationMs ? Math.round(durationMs / 1000) : undefined;
-            let lastResponse: any = { success: false, error: "No matching services found" };
+            let lastResponse: any = { success: false, error: t("translation.backend.noMatchingServicesFound") };
             const fallbackErrors: string[] = [];
             const tidalQuality = getTidalAudioFormat(settings, "auto");
             const isAtmos = settings.autoQuality === "atmos";
@@ -309,7 +349,7 @@ export function useDownload() {
                         const errMsg = response.error || response.message || "Failed";
                         if (isCooldownMessage(errMsg))
                             return response;
-                        fallbackErrors.push(`[Tidal] ${errMsg}`);
+                        fallbackErrors.push(`[Tidal] ${translateMessage(errMsg)}`);
                         lastResponse = response;
                         logger.warning(`Tidal failed, trying next...`);
                     }
@@ -366,7 +406,7 @@ export function useDownload() {
                         const errMsg = response.error || response.message || "Failed";
                         if (isCooldownMessage(errMsg))
                             return response;
-                        fallbackErrors.push(`[Amazon] ${errMsg}`);
+                        fallbackErrors.push(`[Amazon] ${translateMessage(errMsg)}`);
                         lastResponse = response;
                         logger.warning(`amazon failed, trying next...`);
                     }
@@ -423,7 +463,7 @@ export function useDownload() {
                         const errMsg = response.error || response.message || "Failed";
                         if (isCooldownMessage(errMsg))
                             return response;
-                        fallbackErrors.push(`[Qobuz] ${errMsg}`);
+                        fallbackErrors.push(`[Qobuz] ${translateMessage(errMsg)}`);
                         lastResponse = response;
                         logger.warning(`qobuz failed, trying next...`);
                     }
@@ -595,7 +635,7 @@ export function useDownload() {
                 }
             }
             const durationSeconds = durationMs ? Math.round(durationMs / 1000) : undefined;
-            let lastResponse: any = { success: false, error: "No matching services found" };
+            let lastResponse: any = { success: false, error: t("translation.backend.noMatchingServicesFound") };
             const fallbackErrors: string[] = [];
             const tidalQuality = getTidalAudioFormat(settings, "auto");
             const isAtmos = settings.autoQuality === "atmos";
@@ -649,7 +689,7 @@ export function useDownload() {
                         const errMsg = response.error || response.message || "Failed";
                         if (isCooldownMessage(errMsg))
                             return response;
-                        fallbackErrors.push(`[Tidal] ${errMsg}`);
+                        fallbackErrors.push(`[Tidal] ${translateMessage(errMsg)}`);
                         lastResponse = response;
                         logger.warning(`Tidal failed, trying next...`);
                     }
@@ -707,7 +747,7 @@ export function useDownload() {
                         const errMsg = response.error || response.message || "Failed";
                         if (isCooldownMessage(errMsg))
                             return response;
-                        fallbackErrors.push(`[Amazon] ${errMsg}`);
+                        fallbackErrors.push(`[Amazon] ${translateMessage(errMsg)}`);
                         lastResponse = response;
                         logger.warning(`amazon failed, trying next...`);
                     }
@@ -766,7 +806,7 @@ export function useDownload() {
                         const errMsg = response.error || response.message || "Failed";
                         if (isCooldownMessage(errMsg))
                             return response;
-                        fallbackErrors.push(`[Qobuz] ${errMsg}`);
+                        fallbackErrors.push(`[Qobuz] ${translateMessage(errMsg)}`);
                         lastResponse = response;
                         logger.warning(`qobuz failed, trying next...`);
                     }
@@ -839,13 +879,27 @@ export function useDownload() {
         }
         return singleServiceResponse;
     };
-    const handleDownloadTrack = async (id: string, trackName?: string, artistName?: string, albumName?: string, spotifyId?: string, playlistName?: string, durationMs?: number, position?: number, albumArtist?: string, releaseDate?: string, coverUrl?: string, spotifyTrackNumber?: number, spotifyDiscNumber?: number, spotifyTotalTracks?: number, spotifyTotalDiscs?: number, copyright?: string, publisher?: string) => {
+    const handleDownloadTrack = async (id: string, trackName?: string, artistName?: string, albumName?: string, spotifyId?: string, playlistName?: string, durationMs?: number, position?: number, albumArtist?: string, releaseDate?: string, coverUrl?: string, spotifyTrackNumber?: number, spotifyDiscNumber?: number, spotifyTotalTracks?: number, spotifyTotalDiscs?: number, copyright?: string, publisher?: string, queueItemId?: string): Promise<QueueTrackStatus | undefined> => {
         if (!id) {
-            toast.error("No ID found for this track");
+            toast.error(t("translation.download.noIdFoundTrack"));
             return;
         }
         const settings = getSettings();
         const displayArtist = artistName;
+        const directQueueItemId = queueItemId || beginDirectTrackQueueItem({
+            spotify_id: spotifyId || id, name: trackName || id, artists: artistName || "", album_name: albumName || "",
+            album_artist: albumArtist, duration_ms: durationMs || 0, images: coverUrl || "", release_date: releaseDate || "",
+            track_number: spotifyTrackNumber || position || 0, disc_number: spotifyDiscNumber,
+            total_tracks: spotifyTotalTracks, total_discs: spotifyTotalDiscs, external_urls: "", copyright, publisher,
+        }, { folderName: playlistName, startPosition: position });
+        const finishDirectTrack = (status: QueueTrackStatus) => {
+            if (!queueItemId)
+                finishDirectQueueItem(directQueueItemId, {
+                    trackResults: { [spotifyId || id]: status }, successCount: status === "done" ? 1 : 0,
+                    skippedCount: status === "skipped" ? 1 : 0, failedCount: status === "failed" ? 1 : 0,
+                });
+            return status;
+        };
         logger.info(`starting download: ${trackName} - ${displayArtist}`);
         setDownloadingTrack(id);
         try {
@@ -853,11 +907,11 @@ export function useDownload() {
             const response = await downloadWithAutoFallback(id, settings, trackName, artistName, albumName, playlistName, position, spotifyId, durationMs, releaseYear, albumArtist || "", releaseDate, coverUrl, spotifyTrackNumber, spotifyDiscNumber, spotifyTotalTracks, spotifyTotalDiscs, copyright, publisher);
             if (response.success) {
                 if (response.already_exists) {
-                    toast.info(response.message);
+                    toast.info(translateMessage(response.message));
                     setSkippedTracks((prev) => new Set(prev).add(id));
                 }
                 else {
-                    toast.success(response.message);
+                    toast.success(translateMessage(response.message));
                 }
                 setDownloadedTracks((prev) => new Set(prev).add(id));
                 setFailedTracks((prev) => {
@@ -865,34 +919,42 @@ export function useDownload() {
                     newSet.delete(id);
                     return newSet;
                 });
+                return finishDirectTrack(response.already_exists ? "skipped" : "done");
+            }
+            else if (response.cancelled) {
+                if (!queueItemId)
+                    finishDirectQueueItem(directQueueItemId, { trackResults: {}, successCount: 0, skippedCount: 0, failedCount: 0, cancelled: true });
+                return undefined;
             }
             else {
                 if (isCooldownMessage(response.error)) {
-                    toast.info(response.error || "Servers on a scheduled break, try again shortly");
+                    toast.info(t("translation.migrated.useDownload.serversOnAScheduledBreakPausingDownloads"));
                 }
                 else {
-                    toast.error(response.error || "Download failed");
+                    toast.error(translateMessage(response.error || t("translation.download.downloadFailed")));
                 }
                 setFailedTracks((prev) => new Set(prev).add(id));
+                return finishDirectTrack("failed");
             }
         }
         catch (err) {
-            const message = err instanceof Error ? err.message : "Download failed";
+            const message = err instanceof Error ? err.message : t("translation.download.downloadFailed");
             if (isCooldownMessage(message)) {
-                toast.info(message);
+                toast.info(t("translation.migrated.useDownload.serversOnAScheduledBreakPausingDownloads"));
             }
             else {
-                toast.error(message);
+                toast.error(translateMessage(message));
             }
             setFailedTracks((prev) => new Set(prev).add(id));
+            return finishDirectTrack("failed");
         }
         finally {
             setDownloadingTrack(null);
         }
     };
-    const handleDownloadSelected = async (selectedTracks: string[], allTracks: TrackMetadata[], folderName?: string, isAlbum?: boolean) => {
+    const handleDownloadSelected = async (selectedTracks: string[], allTracks: TrackMetadata[], folderName?: string, isAlbum?: boolean, batchSource: BatchDownloadSource = "collection", queueItemId?: string) => {
         if (selectedTracks.length === 0) {
-            toast.error("No tracks selected");
+            toast.error(t("translation.download.noTracksSelected"));
             return;
         }
         logger.info(`starting batch download: ${selectedTracks.length} selected tracks`);
@@ -911,6 +973,12 @@ export function useDownload() {
         const selectedTrackObjects = selectedTracks
             .map((id) => allTracks.find((t) => t.spotify_id === id))
             .filter((t): t is TrackMetadata => t !== undefined);
+        const directQueueItemId = queueItemId || beginDirectCollectionQueueItem({
+            type: queueCollectionType(isAlbum ? "album" : batchSource, selectedTrackObjects), name: folderName || selectedTrackObjects[0]?.album_name || t("translation.queue.queue"),
+            artist: selectedTrackObjects[0]?.album_artist || selectedTrackObjects[0]?.artists || "",
+            info: `${selectedTrackObjects.length} ${t("translation.common.tracks")}`, image: selectedTrackObjects[0]?.images || "",
+            folderName, isAlbum, tracks: selectedTrackObjects,
+        });
         logger.info(`checking existing files in parallel...`);
         const useAlbumTrackNumber = templateUsesAlbumTrackNumber(settings);
         const albumFilenameTemplate = getEffectiveAlbumFilenameTemplate(settings);
@@ -977,10 +1045,11 @@ export function useDownload() {
         let skippedCount = existingSpotifyIDs.size;
         const total = selectedTracks.length;
         const failedErrorMessages = new Map<string, string>();
+        const completedSpotifyIDs = new Set<string>();
         updateBatchProgress(skippedCount, total);
         for (let i = 0; i < tracksToDownload.length; i++) {
             if (shouldStopDownloadRef.current) {
-                toast.info(`Download stopped. ${successCount} tracks downloaded, ${tracksToDownload.length - i} remaining.`);
+                toast.info(t("translation.download.stopped", { count: successCount, remaining: tracksToDownload.length - i }));
                 break;
             }
             const track = tracksToDownload[i];
@@ -994,7 +1063,7 @@ export function useDownload() {
                 const releaseYear = track.release_date?.substring(0, 4);
                 const response = await downloadWithItemID(settings, itemID, track.name, track.artists, track.album_name, folderName, originalIndex + 1, track.spotify_id, track.duration_ms, isAlbum, releaseYear, track.album_artist || "", track.release_date, track.images, track.track_number, track.disc_number, track.total_tracks, track.total_discs, track.copyright, track.publisher);
                 if (response.cancelled || shouldStopDownloadRef.current) {
-                    toast.info(`Download stopped. ${successCount} tracks downloaded, ${tracksToDownload.length - i} remaining.`);
+                    toast.info(t("translation.download.stopped", { count: successCount, remaining: tracksToDownload.length - i }));
                     break;
                 }
                 if (response.success) {
@@ -1005,6 +1074,7 @@ export function useDownload() {
                     }
                     else {
                         successCount++;
+                        completedSpotifyIDs.add(id);
                         logger.success(`downloaded: ${track.name} - ${displayArtist}${formatSourceSuffix(response)}`);
                     }
                     if (response.file) {
@@ -1021,11 +1091,11 @@ export function useDownload() {
                 else {
                     errorCount++;
                     logger.error(`failed: ${track.name} - ${displayArtist}`);
-                    failedErrorMessages.set(id, response.error || "Download failed");
+                    failedErrorMessages.set(id, translateMessage(response.error || t("translation.download.downloadFailed")));
                     setFailedTracks((prev) => new Set(prev).add(id));
                     if (isCooldownMessage(response.error)) {
                         const remaining = tracksToDownload.length - i - 1;
-                        toast.info(response.error || "Servers on a scheduled break. Pausing downloads.");
+                        toast.info(t("translation.migrated.useDownload.serversOnAScheduledBreakPausingDownloads"));
                         logger.info(`cooldown detected, pausing queue with ${remaining} track(s) remaining`);
                         updateBatchProgress(skippedCount + successCount + errorCount, total);
                         break;
@@ -1036,7 +1106,7 @@ export function useDownload() {
                 const message = err instanceof Error ? err.message : String(err);
                 errorCount++;
                 logger.error(`error: ${track.name} - ${err}`);
-                failedErrorMessages.set(id, message);
+                failedErrorMessages.set(id, translateMessage(message));
                 setFailedTracks((prev) => new Set(prev).add(id));
                 if (itemID) {
                     const { MarkDownloadItemFailed } = await import("../../wailsjs/go/main/App");
@@ -1044,7 +1114,7 @@ export function useDownload() {
                 }
                 if (isCooldownMessage(message)) {
                     const remaining = tracksToDownload.length - i - 1;
-                    toast.info("Servers on a scheduled break. Pausing downloads.");
+                    toast.info(t("translation.migrated.useDownload.serversOnAScheduledBreakPausingDownloads"));
                     logger.info(`cooldown detected, pausing queue with ${remaining} track(s) remaining`);
                     updateBatchProgress(skippedCount + successCount + errorCount, total);
                     break;
@@ -1053,6 +1123,7 @@ export function useDownload() {
             const completedCount = skippedCount + successCount + errorCount;
             updateBatchProgress(completedCount, total);
         }
+        const wasStopped = shouldStopDownloadRef.current;
         setDownloadingTrack(null);
         setCurrentDownloadInfo(null);
         setIsDownloading(false);
@@ -1067,11 +1138,11 @@ export function useDownload() {
                 try {
                     logger.info(`creating m3u8 playlist: ${folderName}`);
                     await CreateM3U8File(folderName, outputDir, paths);
-                    toast.success("M3U8 playlist created");
+                    toast.success(t("translation.download.m3u8PlaylistCreated"));
                 }
                 catch (err) {
                     logger.error(`failed to create m3u8 playlist: ${err}`);
-                    toast.error(`Failed to create M3U8 playlist: ${err}`);
+                    toast.error(t("translation.migrated.useDownload.failedToCreateM3U8Playlist", { value1: err }));
                 }
             }
         }
@@ -1111,7 +1182,7 @@ export function useDownload() {
                 try {
                     logger.info(`creating log file: ${folderName}`);
                     await CreateLogFile(folderName, outputDir, logsToExport);
-                    toast.success("Download log created");
+                    toast.success(t("translation.download.downloadLogCreated"));
                 }
                 catch (err) {
                     logger.error(`failed to create log file: ${err}`);
@@ -1120,30 +1191,34 @@ export function useDownload() {
         }
         logger.info(`batch complete: ${successCount} downloaded, ${skippedCount} skipped, ${errorCount} failed`);
         if (errorCount === 0 && skippedCount === 0) {
-            toast.success(`Downloaded ${successCount} tracks successfully`);
+            toast.success(t("translation.download.completed", { count: successCount }));
         }
         else if (errorCount === 0 && successCount === 0) {
-            toast.info(`${skippedCount} tracks already exist`);
+            toast.info(t("translation.download.exists", { count: skippedCount }));
         }
         else if (errorCount === 0) {
-            toast.info(`${successCount} downloaded, ${skippedCount} skipped`);
+            toast.info(t("translation.migrated.useDownload.downloadedSkipped", { value1: successCount, value2: skippedCount }));
         }
         else {
-            const parts = [];
-            if (successCount > 0)
-                parts.push(`${successCount} downloaded`);
-            if (skippedCount > 0)
-                parts.push(`${skippedCount} skipped`);
-            parts.push(`${errorCount} failed`);
-            toast.warning(parts.join(", "));
+            toast.warning(t("translation.download.summary", { downloaded: successCount, skipped: skippedCount, failed: errorCount }));
         }
+        const result = buildQueueExecutionResult(selectedTrackObjects, existingSpotifyIDs, failedErrorMessages, completedSpotifyIDs, wasStopped);
+        if (!queueItemId)
+            finishDirectQueueItem(directQueueItemId, result);
+        return result;
     };
-    const handleDownloadAll = async (tracks: TrackMetadata[], folderName?: string, isAlbum?: boolean) => {
+    const handleDownloadAll = async (tracks: TrackMetadata[], folderName?: string, isAlbum?: boolean, batchSource: BatchDownloadSource = "collection", queueItemId?: string) => {
         const tracksWithId = tracks.filter((track) => track.spotify_id);
         if (tracksWithId.length === 0) {
-            toast.error("No tracks available for download");
+            toast.error(t("translation.download.noTracksAvailableDownload"));
             return;
         }
+        const directQueueItemId = queueItemId || beginDirectCollectionQueueItem({
+            type: queueCollectionType(isAlbum ? "album" : batchSource, tracksWithId), name: folderName || tracksWithId[0]?.album_name || t("translation.queue.queue"),
+            artist: tracksWithId[0]?.album_artist || tracksWithId[0]?.artists || "",
+            info: `${tracksWithId.length} ${t("translation.common.tracks")}`, image: tracksWithId[0]?.images || "",
+            folderName, isAlbum, tracks: tracksWithId,
+        });
         logger.info(`starting batch download: ${tracksWithId.length} tracks`);
         const settings = getSettings();
         setIsDownloading(true);
@@ -1221,10 +1296,11 @@ export function useDownload() {
         let skippedCount = existingSpotifyIDs.size;
         const total = tracksWithId.length;
         const failedErrorMessages = new Map<string, string>();
+        const completedSpotifyIDs = new Set<string>();
         updateBatchProgress(skippedCount, total);
         for (let i = 0; i < tracksToDownload.length; i++) {
             if (shouldStopDownloadRef.current) {
-                toast.info(`Download stopped. ${successCount} tracks downloaded, ${tracksToDownload.length - i} remaining.`);
+                toast.info(t("translation.download.stopped", { count: successCount, remaining: tracksToDownload.length - i }));
                 break;
             }
             const track = tracksToDownload[i];
@@ -1238,7 +1314,7 @@ export function useDownload() {
                 const releaseYear = track.release_date?.substring(0, 4);
                 const response = await downloadWithItemID(settings, itemID, track.name, track.artists, track.album_name, folderName, originalIndex + 1, track.spotify_id, track.duration_ms, isAlbum, releaseYear, track.album_artist || "", track.release_date, track.images, track.track_number, track.disc_number, track.total_tracks, track.total_discs, track.copyright, track.publisher);
                 if (response.cancelled || shouldStopDownloadRef.current) {
-                    toast.info(`Download stopped. ${successCount} tracks downloaded, ${tracksToDownload.length - i} remaining.`);
+                    toast.info(t("translation.download.stopped", { count: successCount, remaining: tracksToDownload.length - i }));
                     break;
                 }
                 if (response.success) {
@@ -1249,6 +1325,7 @@ export function useDownload() {
                     }
                     else {
                         successCount++;
+                        completedSpotifyIDs.add(trackId);
                         logger.success(`downloaded: ${track.name} - ${displayArtist}${formatSourceSuffix(response)}`);
                     }
                     setDownloadedTracks((prev) => new Set(prev).add(trackId));
@@ -1264,11 +1341,11 @@ export function useDownload() {
                 else {
                     errorCount++;
                     logger.error(`failed: ${track.name} - ${displayArtist}`);
-                    failedErrorMessages.set(trackId, response.error || "Download failed");
+                    failedErrorMessages.set(trackId, translateMessage(response.error || t("translation.download.downloadFailed")));
                     setFailedTracks((prev) => new Set(prev).add(trackId));
                     if (isCooldownMessage(response.error)) {
                         const remaining = tracksToDownload.length - i - 1;
-                        toast.info(response.error || "Servers on a scheduled break. Pausing downloads.");
+                        toast.info(t("translation.migrated.useDownload.serversOnAScheduledBreakPausingDownloads"));
                         logger.info(`cooldown detected, pausing queue with ${remaining} track(s) remaining`);
                         updateBatchProgress(skippedCount + successCount + errorCount, total);
                         break;
@@ -1279,13 +1356,13 @@ export function useDownload() {
                 const message = err instanceof Error ? err.message : String(err);
                 errorCount++;
                 logger.error(`error: ${track.name} - ${err}`);
-                failedErrorMessages.set(trackId, message);
+                failedErrorMessages.set(trackId, translateMessage(message));
                 setFailedTracks((prev) => new Set(prev).add(trackId));
                 const { MarkDownloadItemFailed } = await import("../../wailsjs/go/main/App");
                 await MarkDownloadItemFailed(itemID, message);
                 if (isCooldownMessage(message)) {
                     const remaining = tracksToDownload.length - i - 1;
-                    toast.info("Servers on a scheduled break. Pausing downloads.");
+                    toast.info(t("translation.migrated.useDownload.serversOnAScheduledBreakPausingDownloads"));
                     logger.info(`cooldown detected, pausing queue with ${remaining} track(s) remaining`);
                     updateBatchProgress(skippedCount + successCount + errorCount, total);
                     break;
@@ -1294,6 +1371,7 @@ export function useDownload() {
             const completedCount = skippedCount + successCount + errorCount;
             updateBatchProgress(completedCount, total);
         }
+        const wasStopped = shouldStopDownloadRef.current;
         setDownloadingTrack(null);
         setCurrentDownloadInfo(null);
         setIsDownloading(false);
@@ -1306,11 +1384,11 @@ export function useDownload() {
             try {
                 logger.info(`creating m3u8 playlist: ${folderName}`);
                 await CreateM3U8File(folderName, outputDir, finalFilePaths.filter(p => p !== ""));
-                toast.success("M3U8 playlist created");
+                toast.success(t("translation.download.m3u8PlaylistCreated"));
             }
             catch (err) {
                 logger.error(`failed to create m3u8 playlist: ${err}`);
-                toast.error(`Failed to create M3U8 playlist: ${err}`);
+                toast.error(t("translation.migrated.useDownload.failedToCreateM3U8Playlist", { value1: err }));
             }
         }
         if (settings.exportLogsFile && folderName) {
@@ -1349,7 +1427,7 @@ export function useDownload() {
                 try {
                     logger.info(`creating log file: ${folderName}`);
                     await CreateLogFile(folderName, outputDir, logsToExport);
-                    toast.success("Download log created");
+                    toast.success(t("translation.download.downloadLogCreated"));
                 }
                 catch (err) {
                     logger.error(`failed to create log file: ${err}`);
@@ -1358,23 +1436,21 @@ export function useDownload() {
         }
         logger.info(`batch complete: ${successCount} downloaded, ${skippedCount} skipped, ${errorCount} failed`);
         if (errorCount === 0 && skippedCount === 0) {
-            toast.success(`Downloaded ${successCount} tracks successfully`);
+            toast.success(t("translation.download.completed", { count: successCount }));
         }
         else if (errorCount === 0 && successCount === 0) {
-            toast.info(`${skippedCount} tracks already exist`);
+            toast.info(t("translation.download.exists", { count: skippedCount }));
         }
         else if (errorCount === 0) {
-            toast.info(`${successCount} downloaded, ${skippedCount} skipped`);
+            toast.info(t("translation.migrated.useDownload.downloadedSkipped", { value1: successCount, value2: skippedCount }));
         }
         else {
-            const parts = [];
-            if (successCount > 0)
-                parts.push(`${successCount} downloaded`);
-            if (skippedCount > 0)
-                parts.push(`${skippedCount} skipped`);
-            parts.push(`${errorCount} failed`);
-            toast.warning(parts.join(", "));
+            toast.warning(t("translation.download.summary", { downloaded: successCount, skipped: skippedCount, failed: errorCount }));
         }
+        const result = buildQueueExecutionResult(tracksWithId, existingSpotifyIDs, failedErrorMessages, completedSpotifyIDs, wasStopped);
+        if (!queueItemId)
+            finishDirectQueueItem(directQueueItemId, result);
+        return result;
     };
     const handleStopDownload = () => {
         logger.info("download stopped by user");
@@ -1388,7 +1464,7 @@ export function useDownload() {
                 console.error("Failed to force stop downloads:", err);
             }
         })();
-        toast.info("Stopping download...");
+        toast.info(t("translation.migrated.useDownload.stoppingDownload"));
     };
     const resetDownloadedTracks = () => {
         setDownloadedTracks(new Set());

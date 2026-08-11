@@ -1,10 +1,9 @@
+import { t } from "@/i18n";
 import { useState } from "react";
 import { CircleCheck, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { openExternal } from "@/lib/utils";
-import KofiLogo from "@/assets/ko-fi.gif";
-import KofiSvg from "@/assets/kofi_symbol.svg";
 import LynkDarkLogo from "@/assets/lynk_d.png";
 import LynkLightLogo from "@/assets/lynk_l.png";
 import PatreonLogo from "@/assets/patreon.svg";
@@ -68,9 +67,9 @@ export function SupportPage() {
     };
     return (<div className="flex flex-col space-y-2">
       <div className="flex items-center justify-between shrink-0">
-        <h2 className="text-2xl font-bold tracking-tight">Support Me</h2>
-        <Button variant="outline" size="sm" className="h-9 w-24 px-4" aria-label="Open LYNK.id" onClick={() => openExternal("https://tinyurl.com/tip-with-lynk")}>
-          <span role="img" aria-label="LYNK.id" className="flex h-4 items-center justify-center">
+        <h2 className="text-2xl font-bold tracking-tight">{t("translation.migrated.SupportPage.supportMe")}</h2>
+        <Button variant="outline" size="sm" className="h-9 w-24 px-4" aria-label={t("translation.migrated.SupportPage.openLYNKId")} onClick={() => openExternal("https://tinyurl.com/tip-with-lynk")}>
+          <span role="img" aria-label={t("translation.migrated.SupportPage.lynkId")} className="flex h-4 items-center justify-center">
             <img src={LynkLightLogo} alt="" aria-hidden="true" className="h-4 w-auto object-contain dark:hidden"/>
             <img src={LynkDarkLogo} alt="" aria-hidden="true" className="hidden h-4 w-auto object-contain dark:block"/>
           </span>
@@ -78,68 +77,54 @@ export function SupportPage() {
       </div>
 
       <div className="flex flex-col items-center justify-center">
-        <div className="grid w-full max-w-5xl overflow-hidden rounded-xl border bg-card shadow-sm md:grid-cols-3">
-          <div className="flex min-h-84 flex-col items-center justify-between space-y-4 border-b p-4 md:border-b-0 md:border-r">
-            <div className="flex flex-col items-center space-y-2">
-              <div className="relative flex h-32 w-full items-center justify-center">
-                <img src={KofiLogo} className="pointer-events-none absolute w-64" alt="Ko-fi"/>
-              </div>
-              <h4 className="text-lg font-semibold text-foreground">Support via Ko-fi</h4>
-              <p className="px-2 text-center text-sm leading-relaxed text-muted-foreground">
-                Buy me a coffee to help keep development going.
-              </p>
-            </div>
-            <Button className="h-9 w-4/5 gap-2 bg-[#72a4f2] text-sm font-semibold text-white hover:bg-[#5f8cd6]" onClick={() => openExternal("https://ko-fi.com/afkarxyz")}>
-              <img src={KofiSvg} className="h-6 w-6 shrink-0" alt="" aria-hidden="true"/>
-              Support me on Ko-fi
-            </Button>
-          </div>
-
+        <div className="grid w-full max-w-5xl overflow-hidden rounded-xl border bg-card shadow-sm md:grid-cols-2">
           <div className="flex min-h-84 flex-col items-center justify-between space-y-4 border-b p-4 md:border-b-0 md:border-r">
             <div className="flex w-full flex-col items-center space-y-2">
               <div className="flex h-32 w-full items-center justify-center px-4">
-                <img src={PatreonLogo} className="w-56 max-w-full brightness-0 dark:brightness-100" alt="Patreon"/>
+                <img src={PatreonLogo} className="w-64 max-w-full brightness-0 dark:brightness-100" alt="Patreon"/>
               </div>
-              <h4 className="text-lg font-semibold text-foreground">Support via Patreon</h4>
+              <h4 className="text-lg font-semibold text-foreground">{t("translation.migrated.SupportPage.supportViaPatreon")}</h4>
               <p className="px-2 text-center text-sm leading-relaxed text-muted-foreground">
-                Join on Patreon to help fund the project and follow updates.
+                {t("translation.migrated.SupportPage.buyMeACoffeeToHelpKeep")}
               </p>
             </div>
-            <Button className="h-9 w-4/5 gap-2 bg-[#ff424d] text-sm font-semibold text-white hover:bg-[#e63945]" onClick={() => openExternal("https://www.patreon.com/cw/afkarxyz")}>
-              <img src={PatreonSymbol} className="h-5 w-5 shrink-0" alt="" aria-hidden="true"/>
-              Support me on Patreon
-            </Button>
+            <div className="flex min-h-24 w-full items-start justify-center pt-1">
+              <Button className="h-9 w-fit max-w-full gap-1.5 px-4 bg-[#ff424d] text-sm font-semibold text-white hover:bg-[#e63945]" onClick={() => openExternal("https://www.patreon.com/cw/spotbye")}>
+                <img src={PatreonSymbol} className="h-5 w-5 shrink-0" alt="" aria-hidden="true"/>
+                {t("translation.migrated.SupportPage.supportMeOnPatreon")}
+              </Button>
+            </div>
           </div>
 
           <div className="flex min-h-84 flex-col items-center justify-between gap-3 p-4">
             <div className="flex w-full flex-col items-center space-y-2">
               <div className="flex h-32 items-center justify-center">
                 <div className="rounded-lg border bg-white p-1.5 shadow-sm">
-                  <img src={cryptoQr} className="h-28 w-28 object-contain" alt={`${selectedCoin.toUpperCase()} ${selectedNetworkLabel} QR code`}/>
+                  <img src={cryptoQr} className="h-28 w-28 object-contain" alt={t("translation.migrated.SupportPage.qrCode", { value1: selectedCoin.toUpperCase(), value2: selectedNetworkLabel })}/>
                 </div>
               </div>
-              <h4 className="text-lg font-semibold text-foreground">Support via Crypto</h4>
+              <h4 className="text-lg font-semibold text-foreground">{t("translation.migrated.SupportPage.supportViaCrypto")}</h4>
               <p className="px-2 text-center text-sm leading-relaxed text-muted-foreground">
-                Prefer crypto? Use the QR code or wallet address below.
+                {t("translation.migrated.SupportPage.preferCryptoUseTheQRCodeOr")}
               </p>
             </div>
 
             <div className="w-full space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">Coin</label>
+                  <label className="text-[11px] font-medium text-muted-foreground">{t("translation.migrated.SupportPage.coin")}</label>
                   <Select value={selectedCoin} onValueChange={(value: CryptoCoin) => handleCoinChange(value)}>
                     <SelectTrigger size="sm" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="usdt">USDT</SelectItem>
-                      <SelectItem value="usdc">USDC</SelectItem>
+                      <SelectItem value="usdt">{t("translation.migrated.SupportPage.usdt")}</SelectItem>
+                      <SelectItem value="usdc">{t("translation.migrated.SupportPage.usdc")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">Network</label>
+                  <label className="text-[11px] font-medium text-muted-foreground">{t("translation.titleBar.network")}</label>
                   <Select value={selectedNetwork} onValueChange={(value: CryptoNetwork) => {
             setSelectedNetwork(value);
             setCopiedAddress(false);
@@ -158,7 +143,7 @@ export function SupportPage() {
                 <code className="truncate text-xs font-mono text-muted-foreground" title={cryptoAddress}>
                   {cryptoAddress}
                 </code>
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 hover:bg-background" aria-label="Copy wallet address" onClick={() => {
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 hover:bg-background" aria-label={t("translation.migrated.SupportPage.copyWalletAddress")} onClick={() => {
             navigator.clipboard.writeText(cryptoAddress);
             setCopiedAddress(true);
             setTimeout(() => setCopiedAddress(false), 500);
@@ -171,17 +156,17 @@ export function SupportPage() {
         </div>
 
         <div className="mt-2 w-full max-w-5xl rounded-xl border bg-muted/30 px-3 py-2 text-center text-sm text-muted-foreground">
-          If you have any questions or need help with donating, feel free to reach out via{" "}
+          {t("translation.migrated.SupportPage.ifYouHaveAnyQuestionsOrNeed")}{" "}
           <button type="button" className="font-medium text-foreground underline-offset-4 hover:underline" onClick={() => openExternal("https://t.me/afkarxyz")}>
-            Telegram
+            {t("translation.migrated.SupportPage.telegram")}
           </button>{" "}
-          or{" "}
+          {t("translation.migrated.SupportPage.or")}{" "}
           <button type="button" className="font-medium text-foreground underline-offset-4 hover:underline" onClick={() => {
             navigator.clipboard.writeText("hi@afkarxyz.fyi");
             setCopiedEmail(true);
             setTimeout(() => setCopiedEmail(false), 500);
         }}>
-            {copiedEmail ? "copied" : "hi@afkarxyz.fyi"}
+            {copiedEmail ? t("translation.migrated.SupportPage.copied") : t("translation.migrated.SupportPage.hiAfkarxyzFyi")}
           </button>
         </div>
       </div>
